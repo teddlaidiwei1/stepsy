@@ -1,9 +1,10 @@
-// Sound effects: short CC0 sounds from Kenney (Interface Sounds + Digital Audio), see assets/sfx/License-*.txt.
+// Sound effects: Kenney CC0 sounds (see assets/sfx/License-*.txt) layered with notes made in code,
+// built by assets/sfx/build_sfx.py.
 // Played with Web Audio so they start instantly on iPhone. Respects the phone's silent switch ("ambient")
 // and never stops music the kid is already playing. Kids (or parents) can turn sound off on the Me screen.
 const VOL = {
-  tap: 0.3, open: 0.45, close: 0.4, mark: 0.6, coin: 0.5, egg: 0.7, hatch: 0.65, buy: 0.6, nope: 0.45,
-  walkstart: 0.6, walkend: 0.6, alert: 0.55, pet: 0.6, avatar: 0.55, cheer: 0.55, claim: 0.6,
+  tap: 0.45, open: 0.6, close: 0.5, mark: 0.9, coin: 0.85, egg: 0.95, shake: 0.85, hatch: 1, buy: 0.85, nope: 0.6,
+  walkstart: 0.85, walkend: 0.9, alert: 0.8, pet: 0.8, avatar: 0.75, cheer: 0.85, claim: 0.95, levelup: 1,
 };
 const KEY = 'stepsy-sound';
 let ac = null, on = true, pendingTap = 0;

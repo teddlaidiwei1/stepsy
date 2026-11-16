@@ -44,7 +44,8 @@ export function initSocial(c) {
     renderRanks();
   });
   $('addFriend').addEventListener('click', openAddFriend);
-  $('openParent').addEventListener('click', () => ctx.showScreen('parent'));
+  $('openParent').addEventListener('click', () => ctx.gate(() => ctx.showScreen('parent')));
+  $('demoBtn').addEventListener('click', () => ctx.gate(() => ctx.setDemo(!ctx.state.demo)));
   const snd = $('soundBtn');
   const showSnd = () => { snd.textContent = soundOn() ? 'Sound: on' : 'Sound: off'; snd.setAttribute('aria-pressed', soundOn()); };
   snd.addEventListener('click', () => { setSound(!soundOn()); showSnd(); });
@@ -62,7 +63,14 @@ export function initSocial(c) {
 }
 
 // ---------------- Ranks ----------------
-const mySteps = () => DEMO_WEEK_STEPS + ctx.state.steps;
+// Steps this week (Monday to today): made-up history in Demo mode, the real day log otherwise.
+const mySteps = () => {
+  const { state } = ctx;
+  if (state.demo) return DEMO_WEEK_STEPS + state.steps;
+  const d = new Date(); const back = (d.getDay() + 6) % 7; let sum = state.steps;
+  for (let i = 1; i <= back; i++) { const x = new Date(); x.setDate(x.getDate() - i); sum += state.dayLog?.[x.toLocaleDateString('en-CA')] || 0; }
+  return sum;
+};
 const avg = (rows) => Math.round(rows.reduce((s, r) => s + r.steps, 0) / rows.length);
 const medal = (i) => (i < 3 ? ` m${i + 1}` : '');
 
@@ -108,19 +116,26 @@ export function renderRanks() {
 export function renderMe() {
   const { $, esc, fmt, state } = ctx;
   $('meName').textContent = state.nickname;
-  $('meSub').textContent = `${ME.cls} · ${ME.school} (demo)`;
+  $('meSub').textContent = state.demo ? `${ME.cls} · ${ME.school} (demo)` : 'Keep walking to level up!';
+  $('demoBtn').textContent = state.demo ? 'Turn off' : 'Turn on';
+  $('demoBtn').setAttribute('aria-pressed', String(!!state.demo));
+  $('demoNote').textContent = state.demo ? 'Showing made-up demo data. Turn off to go back to your own progress.' : 'For showing the app. Your own progress is kept safe.';
   avatarPicture(state.outfit, { size: 240 }).then((s) => { $('meAvatar').src = s; });
   $('meStats').innerHTML = `
     <div><span class="num">${fmt(state.steps)}</span><span>steps today</span></div>
-    <div><span class="num">${new Set(state.pets.map((p) => p.type)).size}</span><span>pets</span></div>
+    <div><span class="num">${new Set(state.pets.map((p) => p.type)).size}</span><span>${new Set(state.pets.map((p) => p.type)).size === 1 ? 'pet' : 'pets'}</span></div>
     <div><span class="num">Lv ${state.level}</span><span>level</span></div>`;
-  $('meBadges').innerHTML = earnedBadges().map((b) => `<li>${badgeArt(b)}<span>${esc(b.name)}</span></li>`).join('');
-  $('cheersIn').innerHTML = CHEERS_IN.map((c) => `<li><strong>${esc(c.from)}</strong> sent "${esc(c.text)}" <span class="muted small">${esc(c.ago)}</span></li>`).join('');
+  const myBadges = earnedBadges();
+  $('meBadges').innerHTML = myBadges.length ? myBadges.map((b) => `<li>${badgeArt(b)}<span>${esc(b.name)}</span></li>`).join('')
+    : '<li class="empty">No badges yet. Finish your first walk to get one!</li>';
+  $('cheersIn').innerHTML = !state.demo && !state.friends.length
+    ? '<li class="empty">No cheers yet. Add friends and they can cheer you on.</li>'
+    : CHEERS_IN.map((c) => `<li><strong>${esc(c.from)}</strong> sent "${esc(c.text)}" <span class="muted small">${esc(c.ago)}</span></li>`).join('');
 
   const friends = state.friends.map((id) => [...FRIENDS, NEW_FRIEND].find((f) => f.id === id)).filter(Boolean);
   $('friendCount').textContent = `${friends.length}`;
   const grid = $('friendGrid');
-  grid.innerHTML = '';
+  grid.innerHTML = friends.length ? '' : '<p class="empty">No friends yet. Tap Add friend when you are with a friend.</p>';
   friends.forEach((f) => {
     const b = document.createElement('button');
     b.type = 'button';
@@ -242,7 +257,8 @@ export async function renderParent() {
     : '<li class="empty">No alerts. SOS and safe zone alerts show up here.</li>';
 
   // Steps this week (made-up earlier days + today).
-  const demoDays = [6200, 4800, 7300, 5100, 6900, 3900];
+  const demoDays = state.demo ? [6200, 4800, 7300, 5100, 6900, 3900]
+    : [6, 5, 4, 3, 2, 1].map((i) => { const x = new Date(); x.setDate(x.getDate() - i); return state.dayLog?.[x.toLocaleDateString('en-CA')] || 0; });
   const vals = [...demoDays, state.steps];
   const max = Math.max(...vals, 6000);
   $('weekBars').innerHTML = vals.map((v, i) => {

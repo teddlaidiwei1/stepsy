@@ -16,7 +16,10 @@ export function loadGLB(file) {
 export const DEFAULT_OUTFIT = { look: 'male-a', hat: null, eyes: null, hold: null, chair: null, hearing: false };
 export const AVATAR_HEIGHT = 1.55;
 // Where a held thing sits in the right arm bone's space (the hand end of the arm), tuned by eye.
-const HOLD_FIT = { pos: [-0.25, 0, 0.03], rot: [0, -Math.PI / 2, 0], scale: 1.3 };
+const HOLD_FIT = { pos: [-0.16, 0, -0.13], rot: [0, -Math.PI / 2, 0], scale: 1.3 };
+const HOLD_POS = {
+  football: [-0.2, -0.12, -0.17], teddy: [-0.2, -0.08, -0.16], bottle: [-0.17, -0.02, -0.13],
+};
 
 const mat = (color, rough = 0.6) => new THREE.MeshStandardMaterial({ color, roughness: rough, metalness: 0 });
 const put = (parent, mesh, x, y, z, rx = 0, ry = 0, rz = 0) => {
@@ -111,21 +114,39 @@ const HOLDS = {
   },
   football: () => {
     const g = new THREE.Group();
-    put(g, ball(0.24, '#FFFFFF', 18), 0, 0.12, 0.08);
-    [[0, 0.36, 0.08], [0.21, 0.16, 0.13], [-0.21, 0.16, 0.13], [0, 0.12, 0.32], [0.12, -0.04, 0.26], [-0.12, -0.04, 0.26]]
-      .forEach(([x, y, z]) => put(g, ball(0.075, '#2B2B33', 8), x * 0.92, y * 0.92 + 0.01, z * 0.92));
+    const R = 0.2;
+    put(g, ball(R, '#FFFFFF', 28), 0, 0, 0);
+    const ico = new THREE.IcosahedronGeometry(1, 0).getAttribute('position');
+    const seen = [];
+    for (let k = 0; k < ico.count; k++) {
+      const d = new THREE.Vector3().fromBufferAttribute(ico, k).normalize();
+      if (seen.some((v) => v.distanceTo(d) < 0.01)) continue;
+      seen.push(d);
+      const patch = new THREE.Mesh(new THREE.CylinderGeometry(0.075, 0.075, 0.016, 5), mat('#2B2B33', 0.5));
+      patch.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), d);
+      patch.position.copy(d).multiplyScalar(R - 0.002);
+      g.add(patch);
+    }
     return g;
   },
   teddy: () => {
     const g = new THREE.Group();
-    const fur = '#C98B5A', light = '#F1D2B0';
-    put(g, rbox(0.3, 0.32, 0.22, fur, 0.1), 0, 0.12, 0.06);
-    put(g, rbox(0.3, 0.26, 0.24, fur, 0.1), 0, 0.42, 0.06);
-    [-0.12, 0.12].forEach((x) => put(g, rbox(0.1, 0.1, 0.08, fur, 0.04), x, 0.58, 0.06));
-    put(g, rbox(0.14, 0.09, 0.06, light, 0.03), 0, 0.38, 0.19);
-    put(g, rbox(0.05, 0.035, 0.03, '#2B1710', 0.01), 0, 0.41, 0.225);
-    [-0.07, 0.07].forEach((x) => put(g, rbox(0.04, 0.04, 0.02, '#2B1710', 0.01), x, 0.47, 0.185));
-    put(g, rbox(0.16, 0.06, 0.24, '#D42A45', 0.02), 0, 0.29, 0.06);
+    const fur = '#C98B5A', light = '#F1D2B0', dark = '#2B1710';
+    put(g, rbox(0.26, 0.26, 0.2, fur, 0.09), 0, -0.04, 0);                 // body
+    put(g, rbox(0.15, 0.13, 0.04, light, 0.04), 0, -0.05, 0.1);            // tummy
+    put(g, rbox(0.3, 0.26, 0.24, fur, 0.1), 0, 0.22, 0);                   // head
+    [-0.12, 0.12].forEach((x) => {
+      put(g, rbox(0.1, 0.1, 0.07, fur, 0.04), x, 0.36, 0);                // ears
+      put(g, rbox(0.05, 0.05, 0.02, light, 0.02), x, 0.36, 0.04);
+      put(g, rbox(0.09, 0.16, 0.09, fur, 0.04), x * 1.45, 0.0, 0.02, 0, 0, x > 0 ? 0.5 : -0.5); // arms
+      put(g, rbox(0.1, 0.12, 0.13, fur, 0.04), x * 0.75, -0.2, 0.05);     // legs
+      put(g, rbox(0.07, 0.07, 0.02, light, 0.02), x * 0.75, -0.21, 0.12); // paw pads
+    });
+    put(g, rbox(0.14, 0.09, 0.06, light, 0.03), 0, 0.17, 0.12);            // muzzle
+    put(g, rbox(0.05, 0.035, 0.03, dark, 0.01), 0, 0.2, 0.155);            // nose
+    [-0.07, 0.07].forEach((x) => put(g, rbox(0.04, 0.04, 0.02, dark, 0.01), x, 0.26, 0.12)); // eyes
+    put(g, rbox(0.2, 0.05, 0.2, '#D42A45', 0.02), 0, 0.09, 0.01);          // bow ribbon
+    put(g, rbox(0.1, 0.07, 0.04, '#D42A45', 0.02), 0, 0.09, 0.12);
     return g;
   },
   pinwheel: () => {
@@ -322,7 +343,7 @@ export async function buildAvatar(outfit = DEFAULT_OUTFIT) {
     if (arm && thing) {
       const unit = head ? measureHead(model, head).width : 0.45;
       thing.scale.setScalar(unit * HOLD_FIT.scale);
-      thing.position.set(...HOLD_FIT.pos);
+      thing.position.set(...(HOLD_POS[o.hold] || HOLD_FIT.pos));
       thing.rotation.set(...HOLD_FIT.rot);
       thing.name = 'hold';
       arm.add(thing);
@@ -392,7 +413,7 @@ export async function avatarPicture(outfit, { size = 192, head = false } = {}) {
       focus = [];
       av.model.traverse((m) => { if (m.name === 'head-mesh' || m.name === 'hat') focus.push(m); });
     }
-    const top = AVATAR_HEIGHT + (outfit.hat ? 0.4 : 0.2) + (outfit.hold === 'balloon' ? 0.75 : outfit.hold ? 0.3 : 0);
+    const top = AVATAR_HEIGHT + (outfit.hat ? 0.4 : 0.2) + (outfit.hold === 'balloon' ? 1.15 : outfit.hold === 'bubbles' ? 0.7 : outfit.hold ? 0.35 : 0);
     const box = new THREE.Box3(new THREE.Vector3(-0.7, 0, -0.5), new THREE.Vector3(0.7, top, 0.5));
     return snapshot(av.root, head ? { size, yaw: 0.25, pad: 1.9, lift: 0.1, focus } : { size, yaw: 0.45, pad: 1.9, lift: 0.18, box });
   })();

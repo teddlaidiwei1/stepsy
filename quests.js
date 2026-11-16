@@ -22,7 +22,7 @@ function today() {
   return {
     mins: demo ? 15 : walks.reduce((s, w) => s + (w.mins || 0), 0),
     eggs: demo ? 1 : walks.reduce((s, w) => s + (w.eggs || 0), 0),
-    walked: walks.length > 0 || state.steps >= 1000,
+    walked: state.walkDays.includes(t) || state.steps >= 1000,
   };
 }
 function week() {
@@ -33,10 +33,10 @@ function week() {
   if (today().walked) days.add(state.day);
   const km = walks.reduce((s, w) => s + (w.km || 0), 0);
   return {
-    days: Math.min(DEMO_WEEK.days + days.size, 7),
+    days: Math.min((state.demo ? DEMO_WEEK.days : 0) + days.size, 7),
     hatched: state.hatched.filter((t) => weekKey(new Date(t)) === wk).length,
     classKm: DEMO_WEEK.classKm + km,
-    km: DEMO_WEEK.km + km,
+    km: (state.demo ? DEMO_WEEK.km : 0) + km,
   };
 }
 
@@ -137,7 +137,7 @@ export function renderQuests() {
   const days = [];
   for (let i = 6; i >= 0; i--) {
     const d = new Date(); d.setDate(d.getDate() - i);
-    const walked = i === 0 ? today().walked : i < state.streak;
+    const walked = i === 0 ? today().walked : state.walkDays.includes(d.toLocaleDateString('en-CA'));
     days.push({ label: d.toLocaleDateString('en-SG', { weekday: 'narrow' }), walked, today: i === 0, fruit: 6 - i });
   }
   $('streakDays').innerHTML = days.map((d) => `
@@ -145,7 +145,9 @@ export function renderQuests() {
       <span class="sd">${d.walked ? ICONS.feet : ''}</span><span class="sl">${d.today ? 'Today' : d.label}</span>
     </li>`).join('');
   $('streakTitle').textContent = state.streak > 0 ? `${state.streak} days in a row!` : 'Start a streak today';
-  $('streakLine').textContent = state.streak > 0 ? 'Awesome walking!' : 'Rest days are OK. Start a new streak today!';
+  $('streakLine').textContent = state.streak > 0
+    ? (today().walked ? 'Awesome walking! Come back tomorrow.' : 'Walk 1,000 steps today to keep it going.')
+    : 'Rest days are OK. Walk 1,000 steps to start a new streak!';
 
   const earned = earnedBadges().map((b) => b.id);
   $('badgeCount').textContent = `${earned.length} of ${BADGES.length}`;

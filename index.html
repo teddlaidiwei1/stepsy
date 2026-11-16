@@ -22,17 +22,19 @@
 } }
 </script>
 </head>
-<body>
+<body data-view="home">
 <div class="app" id="app">
   <header class="topbar">
-    <button class="profile sticker" id="profileBtn" type="button" aria-label="Your profile">
-      <span class="badge" id="badge"></span>
-      <span class="who">
-        <span class="name" id="nickname">Wei Jie</span>
-        <span class="lvrow"><span class="bar" aria-hidden="true"><span id="levelBar"></span></span><span class="lv" id="levelText">Lv 6</span></span>
-      </span>
-      <span class="streak" id="streak">7-day streak</span>
-    </button>
+    <div class="profile sticker" id="profile">
+      <button class="profile-hit" id="profileBtn" type="button" aria-label="Your profile">
+        <span class="badge" id="badge"></span>
+        <span class="who">
+          <span class="name" id="nickname">Wei Jie</span>
+          <span class="lvrow"><span class="bar" aria-hidden="true"><span id="levelBar"></span></span><span class="lv" id="levelText">Lv 6</span></span>
+        </span>
+      </button>
+      <button class="streak" id="streak" type="button">7-day streak</button>
+    </div>
     <div class="coins sticker" aria-label="Coins">
       <span class="coin-ico" data-art="coin"></span><span id="coins" class="num">1,240</span>
     </div>
@@ -51,7 +53,7 @@
     <section class="steps-card sticker" aria-labelledby="todayTitle">
       <div class="row">
         <h2 id="todayTitle">Today's steps</h2>
-        <button class="chip" id="demoSteps" type="button">Demo +500</button>
+        <button class="chip demo-only" id="demoSteps" type="button">Demo +500</button>
       </div>
       <p class="steps"><span class="num" id="stepsNum">3,420</span> <span class="of">of <span id="goalNum">6,000</span> steps</span></p>
       <div class="goal-bar" id="goalBar" role="progressbar" aria-valuemin="0" aria-labelledby="todayTitle">
@@ -115,7 +117,7 @@
   <!-- QUESTS -->
   <main class="screen" id="screen-quests" data-screen="quests" hidden>
     <section class="streak-card sticker" aria-labelledby="streakTitle">
-      <div class="row"><h2 id="streakTitle">7 days in a row!</h2><button class="chip" id="questDemo" type="button">Demo: finish today</button></div>
+      <div class="row"><h2 id="streakTitle">7 days in a row!</h2><button class="chip demo-only" id="questDemo" type="button">Demo: finish today</button></div>
       <p class="muted" id="streakLine">Awesome walking!</p>
       <ol class="streak-days" id="streakDays"></ol>
     </section>
@@ -124,7 +126,7 @@
       <ul class="quest-list sticker" id="dailyList"></ul>
     </section>
     <section aria-labelledby="weeklyTitle">
-      <div class="row section-head"><h2 id="weeklyTitle">This week</h2><span class="muted">Resets on Monday</span></div>
+      <div class="row section-head"><h2 id="weeklyTitle">This week</h2><span class="muted">Starts again Monday</span></div>
       <ul class="quest-list sticker" id="weeklyList"></ul>
     </section>
     <section aria-labelledby="badgeTitle">
@@ -143,7 +145,7 @@
     <section class="rank-hero sticker" id="rankHero" aria-live="polite"></section>
     <section class="award sticker" aria-labelledby="awardTitle">
       <h2 id="awardTitle">Half-year awards</h2>
-      <p>Every June and November, the top 3 walkers in each class, the top class in each school and the top 10 schools get a certificate and a badge.</p>
+      <p>Every June and November, the best walkers in each class and school win a certificate and a badge.</p>
     </section>
     <section aria-labelledby="rankUnit">
       <div class="row section-head"><h2 id="rankUnit">Steps this week</h2><span class="muted">Demo names</span></div>
@@ -180,6 +182,10 @@
       <span class="pc-ico" data-icon="shield"></span>
       <span><strong id="parentTitle">For parents</strong><span class="muted small">In the real app this is on the parent's own phone.</span></span>
       <button class="btn-soft sm" id="openParent" type="button">Parent view</button>
+    </section>
+    <section class="demo-card sticker" aria-labelledby="demoTitle">
+      <span><strong id="demoTitle">Demo mode</strong><span class="muted small" id="demoNote">For showing the app. Your own progress is kept safe.</span></span>
+      <button class="btn-soft sm" id="demoBtn" type="button" aria-pressed="false">Turn on</button>
     </section>
   </main>
 
@@ -242,8 +248,8 @@
     </div>
 
     <div class="walk-demo">
-      <button class="chip" id="wDemoSteps" type="button">Demo +100 steps</button>
-      <button class="chip" id="wDemoFar" type="button">Demo: walk too far</button>
+      <button class="chip demo-only" id="wDemoSteps" type="button">Demo +100 steps</button>
+      <button class="chip demo-only" id="wDemoFar" type="button">Demo: walk too far</button>
     </div>
 
     <div class="walk-bottom">
@@ -260,6 +266,7 @@
   </section>
 
   <div class="toast" id="toast" role="status" aria-live="polite"></div>
+  <div class="intro" id="intro" hidden></div>
 </div>
 <script>
   // Stepsy needs iOS 16.4+ (import maps). Older phones get a friendly message instead of a blank screen.

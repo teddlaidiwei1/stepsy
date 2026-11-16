@@ -64,6 +64,13 @@ export function createStage(container, { outfit = null, pet = null, mode = 'home
   if (dress) camera.position.set(0, 1.6, 5.4);
   else camera.position.set(0, viewer ? 1.7 : 2.4, viewer ? 5.2 : 7.2);
   camera.lookAt(0, lookY, 0);
+  // Tall held things (balloon, bubbles) poke out of the top, so step the camera back and up a little.
+  const basePos = camera.position.clone();
+  function frameFor(o) {
+    const tall = o?.hold === 'balloon' || o?.hold === 'bubbles';
+    camera.position.set(basePos.x, basePos.y + (tall ? 0.45 : 0), basePos.z * (tall ? 1.18 : 1));
+    camera.lookAt(0, lookY + (tall ? 0.42 : 0), 0);
+  }
   addLights(scene);
   scene.add(makeMound(viewer ? 1.5 : dress ? 1.35 : 2.25));
 
@@ -110,6 +117,7 @@ export function createStage(container, { outfit = null, pet = null, mode = 'home
     holding = av.holding;
     avatar.position.set(dress ? 0 : -0.72, 0, 0);
     avatar.rotation.y = AV_YAW + spin;
+    if (!viewer) frameFor(o);
     scene.add(avatar);
     mixer = new THREE.AnimationMixer(av.model);
     actions = {}; current = null;

@@ -3,7 +3,7 @@ import { eggArt, coinSVG, ICONS } from './art.js';
 import { initSfx, play as sfx } from './sfx.js';
 import { PETS, PET_ORDER, RARITY, rollRarity, rollPet } from './pets.js';
 import { createStepCounter } from './stepcounter.js';
-import { DEFAULT_OUTFIT } from './avatar3d.js';
+import { DEFAULT_OUTFIT, avatarPicture } from './avatar3d.js';
 import { initShop, showShop } from './shop.js';
 import { initQuests, renderQuests, claimable, checkBadges } from './quests.js';
 import { initSocial, renderRanks, renderMe, renderParent } from './social.js';
@@ -16,8 +16,17 @@ const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&l
 
 // ---------------- Saved progress (demo starting values; kept on this phone only) ----------------
 const VERSION = 3;
+// Levels: walking gives XP (1 XP every 5 steps, so 1,000 steps = 200 XP). Each level needs a bit more.
+const XP_PER_STEPS = 5;
+const LEVEL_COINS = 50;
+const needXp = (lv) => 500 + 100 * (lv - 1);
+// Streak: a day counts once the kid reaches 1,000 steps that day.
+const STREAK_STEPS = 1000;
+const dayKey = (back) => { const d = new Date(); d.setDate(d.getDate() - back); return d.toLocaleDateString('en-CA'); };
+// Demo history so the prototype opens on a running streak: the 6 days before today were walking days.
+const seedDays = () => [6, 5, 4, 3, 2, 1].map(dayKey);
 const DEFAULTS = () => ({
-  version: VERSION, nickname: 'Wei Jie', level: 6, levelXp: 0.42, coins: 1240, streak: 7,
+  version: VERSION, nickname: 'Wei Jie', level: 6, xp: 210, coins: 1240, streak: 6, walkDays: seedDays(),
   day: todayKey(), steps: 3420, goal: 6000,
   eggs: [{ id: 'e1', rarity: 'rare', km: 1.2 }],
   pets: [{ id: 'p1', type: 'otter' }],
@@ -25,42 +34,93 @@ const DEFAULTS = () => ({
   // step 3
   outfit: { ...DEFAULT_OUTFIT }, owned: [], claimed: {}, badges: ['first', 'egg', 'week'],
   hatched: [], friends: ['f1', 'f2', 'f3', 'f4'], alerts: [], safeKm: 1, demoDay: null,
+  demo: true, onboarded: true, tips: { home: 1, pets: 1, shop: 1, quests: 1, ranks: 1, me: 1 }, dayLog: {},
+});
+// A real new player: starts at zero with one egg to walk for and Kallie the otter as first buddy.
+const FRESH = () => ({
+  ...DEFAULTS(), nickname: 'Walker', level: 1, xp: 0, coins: 100, streak: 0, walkDays: [], steps: 0,
+  eggs: [{ id: 'e1', rarity: 'common', km: 0 }], pets: [{ id: 'p1', type: 'otter' }], buddy: 'otter',
+  badges: [], friends: [], alerts: [], demo: false, onboarded: false, tips: {}, dayLog: {},
 });
 function load() {
   try {
     const s = JSON.parse(localStorage.getItem('stepsy') || 'null');
-    if (!s || s.version < 2) return DEFAULTS();
+    if (!s || s.version < 2) return FRESH();
     s.version = VERSION;
+    if (s.demo == null) { s.demo = true; s.onboarded = true; s.tips = DEFAULTS().tips; } // saves from before 17 Nov = demo data
+    if (s.day !== todayKey() && s.steps) s.dayLog = { ...(s.dayLog || {}), [s.day]: s.steps };
     if (s.outfit) { s.outfit.chair = null; s.outfit.hearing = false; } // wheelchairs + hearing aid removed (17 Nov)
+    if (s.outfit?.look?.startsWith('female-a')) s.outfit.look = 'female-b'; // look with crutch-like tool removed
     if (s.day !== todayKey()) { s.day = todayKey(); s.steps = 0; }
+    if (s.xp == null) s.xp = Math.round((s.levelXp ?? 0.42) * needXp(s.level || 6)); // old saves: bar % -> XP
+    delete s.levelXp;
+    if (!Array.isArray(s.walkDays)) s.walkDays = seedDays();
     return { ...DEFAULTS(), ...s };
-  } catch { return DEFAULTS(); }
+  } catch { return FRESH(); }
 }
 const state = load();
+if (state.steps >= STREAK_STEPS && !state.walkDays.includes(state.day)) state.walkDays.push(state.day);
+calcStreak();
 initSfx();
 // New day while the app stays open (e.g. installed on the home screen overnight).
 function rollDay() {
   if (state.day === todayKey()) return;
+  if (state.steps) state.dayLog = { ...state.dayLog, [state.day]: state.steps };
   state.day = todayKey(); state.steps = 0;
+  calcStreak();
   save();
+  renderTop();
+}
+
+// Streak = walking days in a row, ending today (or yesterday, so it stays alive until tonight).
+function calcStreak() {
+  const set = new Set(state.walkDays);
+  let back = set.has(dayKey(0)) ? 0 : 1, n = 0;
+  while (set.has(dayKey(back))) { n++; back++; }
+  state.streak = n;
+}
+function markWalkDay() {
+  if (state.steps < STREAK_STEPS || state.walkDays.includes(state.day)) return;
+  state.walkDays = [...state.walkDays, state.day].slice(-90);
+  calcStreak();
+  setTimeout(() => { sfx('cheer'); toast(`Streak! ${state.streak} ${state.streak === 1 ? 'day' : 'days'} in a row`); }, 900);
+}
+function addXp(n) {
+  state.xp += n;
+  let ups = 0;
+  while (state.xp >= needXp(state.level)) { state.xp -= needXp(state.level); state.level++; ups++; }
+  if (!ups) return;
+  state.coins += LEVEL_COINS * ups;
+  setTimeout(() => {
+    sfx('levelup');
+    toast(`Level up! You're Lv ${state.level} now. +${LEVEL_COINS * ups} coins`);
+    renderTop();
+    const p = $('profile'); p.classList.remove('lvpop'); void p.offsetWidth; p.classList.add('lvpop');
+  }, 500);
 }
 function save() { try { localStorage.setItem('stepsy', JSON.stringify(state)); } catch {} }
 const uid = () => Math.random().toString(36).slice(2, 9);
 const eggGoal = (egg) => RARITY[egg.rarity].km;
 const eggReady = (egg) => egg.km >= eggGoal(egg);
+// Eggs are walked in km inside the app, but kids see steps (about 1,800 steps per km).
+const kmSteps = (km) => Math.round(km / 0.00055 / 100) * 100;
+const eggSteps = (egg) => `${fmt(kmSteps(egg.km))} / ${fmt(kmSteps(eggGoal(egg)))} steps`;
 
 // ---------------- Static art ----------------
 document.querySelectorAll('[data-icon]').forEach((el) => { el.innerHTML = ICONS[el.dataset.icon]; });
 document.querySelectorAll('[data-art="coin"]').forEach((el) => { el.innerHTML = coinSVG; });
 
 // ---------------- Toast ----------------
-let toastTimer;
+let toastTimer, toastQ = [];
 function toast(msg) {
+  if (toastTimer) { if (toastQ.length < 3) toastQ.push(msg); return; }
   const t = $('toast');
   t.textContent = msg;
   t.classList.add('show');
-  clearTimeout(toastTimer);
-  toastTimer = setTimeout(() => t.classList.remove('show'), 2400);
+  toastTimer = setTimeout(() => {
+    t.classList.remove('show');
+    setTimeout(() => { toastTimer = 0; const next = toastQ.shift(); if (next) toast(next); }, 250);
+  }, 2200);
 }
 
 // ---------------- Progress shared by walks and the demo button ----------------
@@ -70,7 +130,11 @@ const FRUIT_COINS = 20;
 function addProgress(steps, km) {
   rollDay();
   const before = Math.floor(state.steps / PER_FRUIT);
+  const xpBefore = Math.floor(state.steps / XP_PER_STEPS);
   state.steps += steps;
+  state.dayLog = { ...state.dayLog, [state.day]: state.steps };
+  addXp(Math.floor(state.steps / XP_PER_STEPS) - xpBefore);
+  markWalkDay();
   const after = Math.floor(state.steps / PER_FRUIT);
   const maxFruits = state.goal / PER_FRUIT;
   const newFruits = Math.max(0, Math.min(after, maxFruits) - Math.min(before, maxFruits));
@@ -85,8 +149,9 @@ function addProgress(steps, km) {
 function renderTop() {
   $('nickname').textContent = state.nickname;
   $('levelText').textContent = `Lv ${state.level}`;
-  $('levelBar').style.width = `${Math.round(state.levelXp * 100)}%`;
+  $('levelBar').style.width = `${Math.min(100, Math.round((state.xp / needXp(state.level)) * 100))}%`;
   $('streak').textContent = `${state.streak}-day streak`;
+  $('streak').setAttribute('aria-label', `${state.streak > 0 ? `${state.streak}-day streak` : 'No streak yet'}. See your week`);
   $('coins').textContent = fmt(state.coins);
 }
 
@@ -138,7 +203,7 @@ function renderHomeEgg() {
   $('homeEgg').innerHTML = eggArt(r.egg);
   $('eggTitle').textContent = `${r.label} egg${state.eggs.length > 1 ? ` (+${state.eggs.length - 1} more)` : ''}`;
   const left = eggGoal(egg) - egg.km;
-  $('eggLeft').textContent = eggReady(egg) ? 'Ready to hatch! Tap to open' : `Walk ${left.toFixed(1)} km more to hatch it`;
+  $('eggLeft').textContent = eggReady(egg) ? 'Ready to hatch! Tap to open' : `Walk ${fmt(Math.max(100, kmSteps(left)))} more steps to hatch it`;
   $('eggBar').style.width = `${(egg.km / eggGoal(egg)) * 100}%`;
   card.dataset.egg = egg.id;
   card.classList.toggle('ready', eggReady(egg));
@@ -195,6 +260,7 @@ function hatch(eggId) {
   state.pets.push({ id: uid(), type });
   state.hatched.push(Date.now());
   state.coins += 30;
+  addXp(40);
   save();
 
   const body = openSheet(`
@@ -202,6 +268,7 @@ function hatch(eggId) {
       <div class="hatch-egg shaking">${eggArt(RARITY[egg.rarity].egg)}</div>
       <p class="hatch-wait">Something is moving...</p>
     </div>`, { lock: true });
+  if (!reduceMotion) sfx('shake');
   const reveal = () => {
     sfx('hatch');
     body.innerHTML = `
@@ -268,7 +335,7 @@ function renderPets() {
       <strong>${r.label}</strong>
       ${ready
         ? `<button class="btn-main sm" type="button">Hatch</button>`
-        : `<span class="km num">${egg.km.toFixed(1)} / ${eggGoal(egg)} km</span><span class="bar mint" aria-hidden="true"><span style="width:${(egg.km / eggGoal(egg)) * 100}%"></span></span>`}`;
+        : `<span class="km num">${eggSteps(egg)}</span><span class="bar mint" aria-hidden="true"><span style="width:${(egg.km / eggGoal(egg)) * 100}%"></span></span>`}`;
     tile.querySelector('button')?.addEventListener('click', () => hatch(egg.id));
     row.appendChild(tile);
   });
@@ -304,6 +371,7 @@ $('buddyBtn').addEventListener('click', () => setBuddy(selected));
 function showScreen(name) {
   document.querySelectorAll('[data-screen]').forEach((s) => { s.hidden = s.dataset.screen !== name; });
   document.body.dataset.view = name;
+  showTip(name);
   document.querySelectorAll('.tab').forEach((t) => {
     const on = t.dataset.tab === name;
     t.classList.toggle('on', on);
@@ -377,8 +445,15 @@ $('eggCard').addEventListener('click', () => {
   else { wobble($('homeEgg')); showScreen('pets'); }
 });
 $('profileBtn').addEventListener('click', () => showScreen('me'));
+$('streak').addEventListener('click', () => {
+  showScreen('quests');
+  const card = document.querySelector('.streak-card');
+  card?.scrollIntoView({ block: 'start', behavior: reduceMotion ? 'auto' : 'smooth' });
+  card?.classList.remove('flash'); void card?.offsetWidth; card?.classList.add('flash');
+});
 let pressTimer;
 $('stepsNum').addEventListener('pointerdown', () => {
+  if (!state.demo) return;
   pressTimer = setTimeout(() => {
     try { localStorage.removeItem('stepsy'); } catch {}
     Object.assign(state, DEFAULTS());
@@ -442,7 +517,7 @@ function findEgg() {
       <div class="hatch-egg pop">${eggArt(r.egg)}</div>
       <h2 id="sheetTitle">You found an egg!</h2>
       <p class="rarity r-${rarity}">${r.label}</p>
-      <p>Walk ${r.km} km to hatch it.</p>
+      <p>Walk ${fmt(kmSteps(r.km))} steps to hatch it.</p>
       <div class="sheet-actions"><button class="btn-main" type="button" data-act="close">Keep walking</button></div>
     </div>`);
   body.querySelector('[data-act="close"]').addEventListener('click', closeSheet);
@@ -472,7 +547,7 @@ function renderWalk() {
   const eggs = $('wEggs');
   eggs.innerHTML = state.eggs.map((egg) => {
     const r = RARITY[egg.rarity];
-    return `<div class="w-egg"><span class="egg">${eggArt(r.egg)}</span><span class="bar mint" aria-hidden="true"><span style="width:${(egg.km / eggGoal(egg)) * 100}%"></span></span><span class="num">${eggReady(egg) ? 'Ready!' : `${egg.km.toFixed(1)}/${eggGoal(egg)} km`}</span></div>`;
+    return `<div class="w-egg"><span class="egg">${eggArt(r.egg)}</span><span class="bar mint" aria-hidden="true"><span style="width:${(egg.km / eggGoal(egg)) * 100}%"></span></span><span class="num">${eggReady(egg) ? 'Ready!' : eggSteps(egg)}</span></div>`;
   }).join('') || '<p class="muted">Walk on to find an egg</p>';
   if (walk.start && walk.lastFix) {
     const away = haversineKm(walk.start, walk.lastFix);
@@ -643,6 +718,135 @@ function sendSOS() {
   body.querySelector('[data-act="close"]').addEventListener('click', closeSheet);
 }
 
+// ---------------- Demo mode (for presenting) vs your real progress ----------------
+// Demo mode loads the made-up Wei Jie profile and shows the "Demo" buttons. Your real progress is kept aside
+// and comes back when Demo mode is turned off.
+function setDemo(on) {
+  try {
+    if (on) {
+      localStorage.setItem('stepsy-real', JSON.stringify(state));
+      localStorage.setItem('stepsy', JSON.stringify(DEFAULTS()));
+    } else {
+      const real = localStorage.getItem('stepsy-real');
+      if (real) localStorage.setItem('stepsy', real); else localStorage.removeItem('stepsy');
+      localStorage.removeItem('stepsy-real');
+    }
+  } catch {}
+  location.reload();
+}
+document.body.classList.toggle('demo', !!state.demo);
+
+// ---------------- Grown-ups only: a times-table question before Parent view / Demo mode ----------------
+function gate(onPass) {
+  const a = 6 + Math.floor(Math.random() * 4), b = 6 + Math.floor(Math.random() * 4);
+  const body = openSheet(`
+    <form class="gate">
+      <h2 id="sheetTitle">For grown-ups</h2>
+      <p>What is ${a} × ${b}?</p>
+      <input id="gateIn" type="text" inputmode="numeric" pattern="[0-9]*" maxlength="3" autocomplete="off" aria-label="Answer">
+      <p class="intro-err" id="gateErr" role="alert"></p>
+      <div class="sheet-actions">
+        <button class="btn-soft" type="button" data-act="close">Cancel</button>
+        <button class="btn-main" type="submit">OK</button>
+      </div>
+    </form>`);
+  body.querySelector('[data-act="close"]').addEventListener('click', closeSheet);
+  body.querySelector('form').addEventListener('submit', (e) => {
+    e.preventDefault();
+    if (Number($('gateIn').value) === a * b) { closeSheet(); setTimeout(onPass, 240); }
+    else { $('gateErr').textContent = 'Not quite. Ask a grown-up to help.'; sfx('nope'); }
+  });
+}
+
+// ---------------- First time: a short picture walkthrough for kids ----------------
+const INTRO = [
+  { art: () => `<span class="intro-ico">${ICONS.feet}</span>`, title: 'Walk to play!', text: 'Every step you walk helps you grow and earns coins.' },
+  { art: () => eggArt(RARITY.common.egg), title: 'Find eggs', text: 'Eggs pop up on your walks. Keep walking and they hatch!' },
+  { art: () => `<img src="${petPortrait('otter', 240)}" alt="">`, title: 'Meet Kallie!', text: 'Kallie the otter is your first buddy. Hatch more Singapore animals.' },
+  { art: () => `<span class="intro-ico coin">${coinSVG}</span>`, title: 'Get coins', text: 'Use coins in the Shop for hats and fun stuff. No real money.' },
+  { art: () => `<span class="intro-ico">${ICONS.shield}</span>`, title: 'Stay safe', text: 'Ask a grown-up before you walk. Look up when you cross a road.' },
+];
+function showIntro() {
+  const box = $('intro');
+  let i = 0;
+  const dots = () => `<ol class="intro-dots" aria-hidden="true">${[...INTRO, 0].map((_, k) => `<li class="${k === i ? 'on' : ''}"></li>`).join('')}</ol>`;
+  function draw() {
+    if (i < INTRO.length) {
+      const s = INTRO[i];
+      box.innerHTML = `
+        <div class="intro-card sticker" role="dialog" aria-modal="true" aria-labelledby="introTitle">
+          <button class="intro-skip" type="button" data-act="skip">Skip</button>
+          <div class="intro-art">${s.art()}</div>
+          <h2 id="introTitle">${s.title}</h2>
+          <p>${s.text}</p>
+          ${dots()}
+          <div class="intro-btns">
+            ${i ? '<button class="btn-soft" type="button" data-act="back">Back</button>' : ''}
+            <button class="btn-main" type="button" data-act="next">Next</button>
+          </div>
+        </div>`;
+    } else {
+      box.innerHTML = `
+        <form class="intro-card sticker" role="dialog" aria-modal="true" aria-labelledby="introTitle">
+          <div class="intro-art"><img id="introAv" alt=""></div>
+          <h2 id="introTitle">What's your nickname?</h2>
+          <p>Pick a fun game name. Friends will see it, so don't use your real name.</p>
+          <input id="introName" type="text" maxlength="12" autocomplete="off" autocapitalize="words" enterkeyhint="go" placeholder="Like: Ace" aria-labelledby="introTitle">
+          <p class="intro-err" id="introErr" role="alert"></p>
+          ${dots()}
+          <div class="intro-btns">
+            <button class="btn-soft" type="button" data-act="back">Back</button>
+            <button class="btn-main" type="submit">Let's go!</button>
+          </div>
+        </form>`;
+      avatarPicture(state.outfit, { size: 240 }).then((src) => { const im = $('introAv'); if (im) im.src = src; });
+      box.querySelector('form').addEventListener('submit', (e) => {
+        e.preventDefault();
+        const name = $('introName').value.replace(/\s+/g, ' ').trim();
+        if (name.length < 2) { $('introErr').textContent = 'Type a nickname first (2 letters or more).'; return; }
+        state.nickname = name;
+        state.onboarded = true;
+        save();
+        box.hidden = true; box.innerHTML = '';
+        renderAll(true);
+        renderTop();
+        sfx('cheer');
+        toast(`Hi ${name}! Tap Start walk to begin.`);
+        showTip('home');
+      });
+    }
+    box.querySelector('[data-act="next"]')?.addEventListener('click', () => { i++; draw(); });
+    box.querySelector('[data-act="back"]')?.addEventListener('click', () => { i--; draw(); });
+    box.querySelector('[data-act="skip"]')?.addEventListener('click', () => { i = INTRO.length; draw(); });
+  }
+  box.hidden = false;
+  draw();
+}
+
+// ---------------- First visit to each screen: one short tip ----------------
+const TIPS = {
+  home: 'Tap Start walk and go! Keep the app open to count steps. Tap your picture at the top to see your badges.',
+  pets: 'Your eggs and pets live here. Tap a pet to see it up close.',
+  shop: 'Tap anything to try it on. Like it? Buy it with coins.',
+  quests: 'Fill up a bar, then tap Claim to get coins.',
+  ranks: 'See who walked the most this week in your class.',
+  me: 'Your badges and friends live here. To add a friend, meet them and tap Add friend.',
+};
+function showTip(name) {
+  if (!state.onboarded || state.tips[name] || !TIPS[name]) return;
+  const screen = $(`screen-${name}`);
+  if (!screen || screen.querySelector('.tip')) return;
+  const tip = document.createElement('div');
+  tip.className = 'tip sticker';
+  tip.setAttribute('role', 'note');
+  tip.innerHTML = `<span class="tip-ico">${ICONS.bell}</span><p>${TIPS[name]}</p><button class="btn-main sm" type="button">Got it</button>`;
+  tip.querySelector('button').addEventListener('click', () => {
+    state.tips = { ...state.tips, [name]: 1 }; save(); tip.remove();
+  });
+  const head = screen.querySelector('.sub-head');
+  if (head) head.after(tip); else screen.prepend(tip);
+}
+
 // ---------------- Start ----------------
 function renderAll(animate) {
   renderHome(animate);
@@ -651,12 +855,13 @@ function renderAll(animate) {
   updateDots();
 }
 const addSteps = (n) => { addProgress(n, n * STRIDE_KM); renderAll(true); };
-const ctx = { state, save, toast, addSteps, openSheet, closeSheet, $, fmt, esc, renderTop, applyOutfit, showScreen, coinBurst, updateDots };
+const ctx = { state, save, toast, addSteps, setDemo, showTip, gate, openSheet, closeSheet, $, fmt, esc, renderTop, applyOutfit, showScreen, coinBurst, updateDots };
 initShop(ctx);
 initQuests(ctx);
 initSocial(ctx);
 let homeStage = null;
 renderAll(true);
+if (!state.onboarded) showIntro(); else showTip('home');
 setInterval(() => { if (!document.hidden && !walk) wobble($('homeEgg')); }, 6000);
 
 homeStage = createStage($('stage'), { outfit: state.outfit, pet: state.buddy, mode: 'home', onReady: setBadge });

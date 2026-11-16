@@ -2,10 +2,10 @@
 // School names checked by Gemini Hydrogen (16 Nov 2026) as not matching a real Singapore primary school.
 
 const BASE_LOOKS = [
-  'male-a', 'female-a', 'male-b', 'female-b', 'male-e', 'female-c',
+  'male-a', 'female-b', 'male-b', 'female-c', 'male-e',
   'male-f', 'female-e', 'male-d', 'female-d', 'male-c', 'female-f',
 ];
-// 36 looks: each base character plus two recoloured versions (new clothes colours, another skin tone).
+// 33 looks (female-a dropped 17 Nov: her tool reads as crutches): each base character plus two recoloured versions (new clothes colours, another skin tone).
 export const LOOKS = [...BASE_LOOKS, ...BASE_LOOKS.map((l) => `${l}.2`), ...BASE_LOOKS.map((l) => `${l}.3`)];
 
 // kind: hat / eyes / hold. price 0 = free. care = an aid, always free and never sold.
@@ -51,7 +51,7 @@ export const CHEERS = ['Nice walk!', "Let's walk together!", 'Every step counts!
 export const ME = { cls: '5B', school: 'Sunbird Primary', code: 'WJ-4821' };
 
 export const FRIENDS = [
-  { id: 'f1', name: 'Aisyah', cls: '5B', outfit: { look: 'female-a', hat: 'bucket' }, buddy: 'kingfisher', pets: ['kingfisher', 'otter', 'pangolin'], badges: ['first', 'egg', '5k', 'week'], today: 4210 },
+  { id: 'f1', name: 'Aisyah', cls: '5B', outfit: { look: 'female-c.3', hat: 'bucket' }, buddy: 'kingfisher', pets: ['kingfisher', 'otter', 'pangolin'], badges: ['first', 'egg', '5k', 'week'], today: 4210 },
   { id: 'f2', name: 'Jun Hao', cls: '5B', outfit: { look: 'male-b', hat: 'cap-sky' }, buddy: 'monitor', pets: ['monitor', 'otter'], badges: ['first', 'egg'], today: 2980 },
   { id: 'f3', name: 'Priya', cls: '5A', outfit: { look: 'female-e' }, buddy: 'hornbill', pets: ['hornbill', 'kingfisher', 'otter', 'mousedeer'], badges: ['first', 'egg', 'collector', 'week', 'explorer'], today: 5120 },
   { id: 'f4', name: 'Kai', cls: '5C', outfit: { look: 'male-e', eyes: 'sunglasses' }, buddy: 'otter', pets: ['otter'], badges: ['first'], today: 1640 },
@@ -70,7 +70,7 @@ function seeded(seed) {
 }
 const GIRLS = ['Aisyah', 'Mei Ling', 'Nur Iman', 'Hana', 'Sofia', 'Chloe', 'Divya', 'Xin Yi', 'Isabelle', 'Zi Xuan', 'Kavya', 'Alya'];
 const BOYS = ['Jun Hao', 'Ethan', 'Arjun', 'Darren', 'Rayyan', 'Wei Ming', 'Ryan', 'Haziq', 'Aaron', 'Marcus', 'Jayden'];
-const GIRL_LOOKS = ['female-a', 'female-b', 'female-c', 'female-e', 'female-f', 'female-d'];
+const GIRL_LOOKS = ['female-c.3', 'female-b', 'female-c', 'female-e', 'female-f', 'female-d'];
 const BOY_LOOKS = ['male-a', 'male-e', 'male-f', 'male-d'];
 const CLASSMATES = [
   ...GIRLS.map((name, i) => ({ name, look: GIRL_LOOKS[i % GIRL_LOOKS.length] })),
