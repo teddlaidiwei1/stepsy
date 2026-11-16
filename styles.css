@@ -728,3 +728,5 @@ body:not(.demo) .demo-only { display: none !important; }
 .gate { display: grid; gap: 8px; text-align: center; }
 .gate p { margin: 0; font-size: 22px; font-weight: 800; }
 .gate input { font: inherit; font-size: 26px; font-weight: 800; text-align: center; color: var(--ink); width: 120px; justify-self: center; border: var(--line) solid var(--ink); border-radius: 14px; padding: 6px; background: var(--card-soft); }
+/* Pop-ups take focus when they open; no ring on the box itself. */
+.sheet:focus, .intro-card:focus { outline: none; }

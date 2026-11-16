@@ -44,7 +44,7 @@ const FRESH = () => ({
 });
 function load() {
   try {
-    const s = JSON.parse(localStorage.getItem('stepsy') || 'null');
+    const s = JSON.parse(localStorage.getItem('stepsy') || localStorage.getItem('stepsy-real') || 'null');
     if (!s || s.version < 2) return FRESH();
     s.version = VERSION;
     if (s.demo == null) { s.demo = true; s.onboarded = true; s.tips = DEFAULTS().tips; } // saves from before 17 Nov = demo data
@@ -81,7 +81,7 @@ function calcStreak() {
 }
 function markWalkDay() {
   if (state.steps < STREAK_STEPS || state.walkDays.includes(state.day)) return;
-  state.walkDays = [...state.walkDays, state.day].slice(-90);
+  state.walkDays = [...state.walkDays, state.day].slice(-730);
   calcStreak();
   setTimeout(() => { sfx('cheer'); toast(`Streak! ${state.streak} ${state.streak === 1 ? 'day' : 'days'} in a row`); }, 900);
 }
@@ -229,18 +229,29 @@ function renderHome(animate) {
 
 // ---------------- Sheets ----------------
 let sheetOnClose = null;
+// Only the open pop-up (and the toast) can be reached; everything else in the app is inert.
+function trapTo(...keep) { [...$('app').children].forEach((el) => { el.inert = keep.length > 0 && !keep.includes(el); }); }
+let sheetOpen = false, sheetReturn = null;
 function openSheet(html, { onClose, lock = false } = {}) {
+  if (!sheetOpen) sheetReturn = document.activeElement;
+  sheetOpen = true;
   $('sheetBody').innerHTML = html;
   if ($('sheet').hidden) sfx('open');
   $('scrim').hidden = false;
   $('sheet').hidden = false;
   $('scrim').dataset.lock = lock ? '1' : '';
   sheetOnClose = onClose || null;
+  trapTo($('scrim'), $('sheet'), $('toast'));
+  $('sheet').focus({ preventScroll: true });
   requestAnimationFrame(() => { $('scrim').classList.add('show'); $('sheet').classList.add('show'); });
   return $('sheetBody');
 }
 function closeSheet() {
   if (!$('sheet').hidden) sfx('close');
+  sheetOpen = false;
+  trapTo(...($('intro').hidden ? [] : [$('intro'), $('toast')]));
+  const back = sheetReturn; sheetReturn = null;
+  if (back && document.contains(back) && !back.closest('[hidden]')) back.focus({ preventScroll: true });
   $('scrim').classList.remove('show');
   $('sheet').classList.remove('show');
   setTimeout(() => { $('scrim').hidden = true; $('sheet').hidden = true; $('sheetBody').innerHTML = ''; }, 220);
@@ -289,13 +300,19 @@ function hatch(eggId) {
     body.querySelector('[data-act="close"]').addEventListener('click', closeSheet);
     body.querySelector('[data-act="buddy"]').addEventListener('click', () => { setBuddy(type); closeSheet(); });
     body.querySelector('[data-act="close"]').focus();
+    // Show the new pet straight away on the Pets screen (it used to keep showing the old one).
+    selected = type;
+    petStage?.setPet(type);
     renderAll();
+    if (!$('screen-pets').hidden) renderPets();
   };
   setTimeout(reveal, reduceMotion ? 300 : 1700);
 }
 
 function setBuddy(type) {
   state.buddy = type;
+  selected = type;
+  petStage?.setPet(type);
   save();
   homeStage?.setPet(type);
   renderBuddy();
@@ -430,7 +447,8 @@ function setBadge(url) {
   if (!img) { img = new Image(); img.alt = ''; badge.appendChild(img); }
   img.src = url;
 }
-function applyOutfit(o) { homeStage?.setOutfit(o); }
+// Wearing something new also redraws the small picture in the top bar (it used to keep the old look).
+function applyOutfit(o) { homeStage?.setOutfit(o); avatarPicture(o, { size: 96, head: true }).then(setBadge); }
 
 // ---------------- Home interactions ----------------
 $('demoSteps').addEventListener('click', () => {
@@ -455,8 +473,8 @@ let pressTimer;
 $('stepsNum').addEventListener('pointerdown', () => {
   if (!state.demo) return;
   pressTimer = setTimeout(() => {
-    try { localStorage.removeItem('stepsy'); } catch {}
     Object.assign(state, DEFAULTS());
+    save();
     shownSteps = 0; selected = state.buddy;
     homeStage?.setPet(state.buddy);
     homeStage?.setOutfit(state.outfit);
@@ -620,8 +638,15 @@ async function startWalk() {
     walk.mode = 'sensor';
     setStatus('Counting steps', 'ok');
     showAlert('Keep this screen open and unlocked. Steps and the safe zone pause if you leave.', 'info', 7000);
+  } else if (!state.demo) {
+    // Real player without step counting: no made-up steps, just say how to fix it.
+    walk.mode = 'off';
+    setStatus('Not counting', 'paused');
+    showAlert(result === 'denied'
+      ? 'Steps are not counting because motion access is off. Ask a grown-up to allow Motion for this website, then start again.'
+      : 'This device cannot count steps. Try Stepsy on a phone.', 'info', 9000);
   } else {
-    // No motion sensor here (a computer, or permission was refused): run a gentle demo walk.
+    // Demo mode with no motion sensor (a computer, or permission was refused): run a gentle demo walk.
     walk.mode = 'demo';
     setStatus('Demo walk', 'demo');
     showAlert(result === 'denied'
@@ -682,7 +707,8 @@ document.addEventListener('visibilitychange', () => {
   } else {
     walk.paused = false;
     walk.lastTick = performance.now();
-    setStatus(walk.mode === 'sensor' ? 'Counting steps' : 'Demo walk', walk.mode === 'sensor' ? 'ok' : 'demo');
+    if (walk.mode === 'off') setStatus('Not counting', 'paused');
+    else setStatus(walk.mode === 'sensor' ? 'Counting steps' : 'Demo walk', walk.mode === 'sensor' ? 'ok' : 'demo');
     showAlert('Your walk paused while you left the app. Steps only count with this screen open.', 'info', 5000);
   }
 });
@@ -724,7 +750,7 @@ function sendSOS() {
 function setDemo(on) {
   try {
     if (on) {
-      localStorage.setItem('stepsy-real', JSON.stringify(state));
+      if (!state.demo || !localStorage.getItem('stepsy-real')) localStorage.setItem('stepsy-real', JSON.stringify(state));
       localStorage.setItem('stepsy', JSON.stringify(DEFAULTS()));
     } else {
       const real = localStorage.getItem('stepsy-real');
@@ -751,6 +777,7 @@ function gate(onPass) {
       </div>
     </form>`);
   body.querySelector('[data-act="close"]').addEventListener('click', closeSheet);
+  $('gateIn').focus();
   body.querySelector('form').addEventListener('submit', (e) => {
     e.preventDefault();
     if (Number($('gateIn').value) === a * b) { closeSheet(); setTimeout(onPass, 240); }
@@ -774,7 +801,7 @@ function showIntro() {
     if (i < INTRO.length) {
       const s = INTRO[i];
       box.innerHTML = `
-        <div class="intro-card sticker" role="dialog" aria-modal="true" aria-labelledby="introTitle">
+        <div class="intro-card sticker" role="dialog" aria-modal="true" aria-labelledby="introTitle" tabindex="-1">
           <button class="intro-skip" type="button" data-act="skip">Skip</button>
           <div class="intro-art">${s.art()}</div>
           <h2 id="introTitle">${s.title}</h2>
@@ -787,7 +814,7 @@ function showIntro() {
         </div>`;
     } else {
       box.innerHTML = `
-        <form class="intro-card sticker" role="dialog" aria-modal="true" aria-labelledby="introTitle">
+        <form class="intro-card sticker" role="dialog" aria-modal="true" aria-labelledby="introTitle" tabindex="-1">
           <div class="intro-art"><img id="introAv" alt=""></div>
           <h2 id="introTitle">What's your nickname?</h2>
           <p>Pick a fun game name. Friends will see it, so don't use your real name.</p>
@@ -808,6 +835,7 @@ function showIntro() {
         state.onboarded = true;
         save();
         box.hidden = true; box.innerHTML = '';
+        trapTo();
         renderAll(true);
         renderTop();
         sfx('cheer');
@@ -818,8 +846,13 @@ function showIntro() {
     box.querySelector('[data-act="next"]')?.addEventListener('click', () => { i++; draw(); });
     box.querySelector('[data-act="back"]')?.addEventListener('click', () => { i--; draw(); });
     box.querySelector('[data-act="skip"]')?.addEventListener('click', () => { i = INTRO.length; draw(); });
+    // First slide: focus the card itself; after a tap, focus the next thing to press (or the name box).
+    (moved ? box.querySelector('#introName, [data-act="next"]') : box.querySelector('.intro-card'))?.focus({ preventScroll: true });
+    moved = true;
   }
+  let moved = false;
   box.hidden = false;
+  trapTo($('intro'), $('toast'));
   draw();
 }
 
@@ -849,6 +882,7 @@ function showTip(name) {
 
 // ---------------- Start ----------------
 function renderAll(animate) {
+  rollDay();
   renderHome(animate);
   if (!$('screen-pets').hidden) renderPets();
   if (!$('screen-quests').hidden) renderQuests(); else checkBadges();
@@ -863,5 +897,7 @@ let homeStage = null;
 renderAll(true);
 if (!state.onboarded) showIntro(); else showTip('home');
 setInterval(() => { if (!document.hidden && !walk) wobble($('homeEgg')); }, 6000);
+// App left open past midnight: start the new day without waiting for a step or a tab switch.
+setInterval(() => { if (!walk && state.day !== todayKey()) { rollDay(); renderAll(false); } }, 30000);
 
 homeStage = createStage($('stage'), { outfit: state.outfit, pet: state.buddy, mode: 'home', onReady: setBadge });

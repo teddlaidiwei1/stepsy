@@ -29,13 +29,15 @@ function week() {
   const { state } = ctx;
   const wk = weekKey();
   const walks = state.walks.filter((w) => weekKey(new Date(w.at)) === wk);
-  const days = new Set(walks.map((w) => dayOf(w.at)));
+  const days = new Set(walks.filter((w) => w.steps > 0).map((w) => dayOf(w.at)));
   if (today().walked) days.add(state.day);
+  // Real players: every 1,000-step day this week counts too, even without a walk session.
+  if (!state.demo) state.walkDays.filter((d) => weekKey(new Date(`${d}T12:00`)) === wk).forEach((d) => days.add(d));
   const km = walks.reduce((s, w) => s + (w.km || 0), 0);
   return {
     days: Math.min((state.demo ? DEMO_WEEK.days : 0) + days.size, 7),
     hatched: state.hatched.filter((t) => weekKey(new Date(t)) === wk).length,
-    classKm: DEMO_WEEK.classKm + km,
+    classKm: (state.demo ? DEMO_WEEK.classKm : 0) + km,
     km: (state.demo ? DEMO_WEEK.km : 0) + km,
   };
 }
