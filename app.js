@@ -288,7 +288,8 @@ function hatch(eggId) {
     </div>`, { lock: true });
   if (!reduceMotion) sfx('shake');
   const reveal = () => {
-    const gold = isGold(type);
+    // A new hatch is never gold (only 5 copies joined with Make gold are), even if you already own a gold one.
+    const gold = false;
     sfx('hatch');
     body.innerHTML = `
       <div class="hatch revealed">

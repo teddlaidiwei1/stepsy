@@ -233,16 +233,7 @@ export function renderMe() {
     $('profCheers').innerHTML = who.friend ? CHEERS.map((c) => `<button class="chip" type="button">${esc(c)}</button>`).join('') : '';
     $('profNote').textContent = who.friend ? 'Friends can only send cheers. There is no chat.'
       : `You can add ${name} as a friend when you meet in person. Then you can send cheers.`;
-    $('profCheers').querySelectorAll('.chip').forEach((b) => b.addEventListener('click', async () => {
-      if (who.online) {
-        b.disabled = true;
-        try { await online.sendCheer(who.uid, b.textContent, state.nickname); }
-        catch { ctx.toast('Could not send. Check the internet and try again.'); b.disabled = false; return; }
-        b.disabled = false;
-      }
-      sfx('cheer');
-      ctx.toast(`Cheer sent to ${name}: "${b.textContent}"`);
-    }));
+    if (who.friend) wireCheers(who, name);
     return;
   }
 
@@ -297,6 +288,41 @@ export function renderMe() {
     b.addEventListener('click', () => showProfile({ ...f, friend: true }));
     grid.appendChild(b);
   });
+}
+
+// ---------------- Cheers: one per friend per hour (the Firebase rules check this too) ----------------
+const CHEER_GAP = 60 * 60 * 1000;
+function cheeredAt() { try { return JSON.parse(localStorage.getItem('stepsy-cheered')) || {}; } catch { return {}; } }
+function markCheered(uid) {
+  const m = cheeredAt(); m[uid] = Date.now();
+  for (const k of Object.keys(m)) if (Date.now() - m[k] > CHEER_GAP) delete m[k];
+  try { localStorage.setItem('stepsy-cheered', JSON.stringify(m)); } catch {}
+}
+function wireCheers(who, name) {
+  const { $, state } = ctx;
+  const wait = who.online ? CHEER_GAP - (Date.now() - (cheeredAt()[who.uid] || 0)) : 0;
+  if (wait > 0) {
+    const mins = Math.max(1, Math.ceil(wait / 60000));
+    $('profCheers').querySelectorAll('.chip').forEach((b) => { b.disabled = true; });
+    $('profNote').textContent = `You cheered ${name}. You can cheer again in ${mins} min.`;
+    return;
+  }
+  $('profCheers').querySelectorAll('.chip').forEach((b) => b.addEventListener('click', async () => {
+    if (who.online) {
+      $('profCheers').querySelectorAll('.chip').forEach((x) => { x.disabled = true; });
+      try { await online.sendCheer(who.uid, b.textContent, state.nickname); }
+      catch (e) {
+        if (e?.code === 'permission-denied') { markCheered(who.uid); ctx.toast(`You already cheered ${name}. Try again later.`); wireCheers(who, name); return; }
+        ctx.toast('Could not send. Check the internet and try again.');
+        $('profCheers').querySelectorAll('.chip').forEach((x) => { x.disabled = false; });
+        return;
+      }
+      markCheered(who.uid);
+      wireCheers(who, name);
+    }
+    sfx('cheer');
+    ctx.toast(`Cheer sent to ${name}: "${b.textContent}"`);
+  }));
 }
 
 // ---------------- Real friends (online) ----------------

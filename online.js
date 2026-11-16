@@ -126,7 +126,7 @@ function listen() {
   const q = f.query(f.collection(f.db, 'players', me.uid, 'cheers'), f.orderBy('at', 'desc'), f.limit(10));
   let first = true;
   f.onSnapshot(q, (snap) => {
-    const fresh = first ? [] : snap.docChanges().filter((c) => c.type === 'added').map((c) => c.doc.data());
+    const fresh = first ? [] : snap.docChanges().filter((c) => c.type !== 'removed').map((c) => c.doc.data());
     first = false;
     cheers = snap.docs.map((d) => ({ ...d.data(), at: d.data().at?.toMillis?.() || Date.now() }));
     changed();
@@ -203,7 +203,8 @@ export const friendProfile = profileSoon;
 export async function sendCheer(friendUid, text, fromName) {
   await ready;
   const f = fb;
-  await f.addDoc(f.collection(f.db, 'players', friendUid, 'cheers'), {
+  // One cheer slot per friend (its ID is you). The rules only let you fill it again an hour after the last cheer.
+  await f.setDoc(f.doc(f.db, 'players', friendUid, 'cheers', me.uid), {
     from: String(fromName || 'A friend').slice(0, 16), fromUid: me.uid, text, at: f.serverTimestamp(),
   });
 }

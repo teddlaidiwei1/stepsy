@@ -54,13 +54,15 @@ service cloud.firestore {
       }
 
       // Cheers: only friends can send, only the fixed cheer words, only you can read yours.
+      // One slot per friend (its ID is the sender), filled again at most once an hour, so nobody can spam you.
       match /cheers/{cid} {
         allow read, delete: if signedIn() && request.auth.uid == uid;
-        allow create: if signedIn() && isFriend(uid)
+        allow create, update: if signedIn() && isFriend(uid) && cid == request.auth.uid
           && request.resource.data.keys().hasOnly(['from', 'fromUid', 'text', 'at'])
           && request.resource.data.fromUid == request.auth.uid && shortStr(request.resource.data.from, 16)
-          && request.resource.data.text in ['Nice walk!', "Let's walk together!", 'Every step counts!', 'Cute pet!', 'You can do it!', 'High five!'];
-        allow update: if false;
+          && request.resource.data.at == request.time
+          && request.resource.data.text in ['Nice walk!', "Let's walk together!", 'Every step counts!', 'Cute pet!', 'You can do it!', 'High five!']
+          && (resource == null || request.time > resource.data.at + duration.value(1, 'h'));
       }
     }
   }
