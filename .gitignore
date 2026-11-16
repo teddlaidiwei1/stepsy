@@ -1,0 +1,9 @@
+# Design notes stay private
+PRODUCT.md
+.impeccable/
+DESIGN.md
+# Local / editor files
+.claude/
+*.log
+Thumbs.db
+desktop.ini

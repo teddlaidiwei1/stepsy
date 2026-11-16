@@ -1,0 +1,269 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="Stepsy">
+<meta name="theme-color" content="#FFE6DA">
+<title>Stepsy</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<link rel="icon" type="image/svg+xml" href="icons/icon.svg">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;700;800&display=swap">
+<link rel="stylesheet" href="styles.css">
+<script type="importmap">
+{ "imports": {
+  "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+  "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+} }
+</script>
+</head>
+<body>
+<div class="app" id="app">
+  <header class="topbar">
+    <button class="profile sticker" id="profileBtn" type="button" aria-label="Your profile">
+      <span class="badge" id="badge"></span>
+      <span class="who">
+        <span class="name" id="nickname">Wei Jie</span>
+        <span class="lvrow"><span class="bar" aria-hidden="true"><span id="levelBar"></span></span><span class="lv" id="levelText">Lv 6</span></span>
+      </span>
+      <span class="streak" id="streak">7-day streak</span>
+    </button>
+    <div class="coins sticker" aria-label="Coins">
+      <span class="coin-ico" data-art="coin"></span><span id="coins" class="num">1,240</span>
+    </div>
+  </header>
+
+  <!-- HOME -->
+  <main class="screen" id="screen-home" data-screen="home">
+    <section class="stage sticker" aria-label="Your avatar and buddy">
+      <div class="cloud c1" aria-hidden="true"></div>
+      <div class="cloud c2" aria-hidden="true"></div>
+      <div class="canvas" id="stage"></div>
+      <div class="pet-tag"><strong id="buddyName">Kallie</strong> <span id="buddySpecies">Otter</span></div>
+      <p class="hint">Tap them</p>
+    </section>
+
+    <section class="skewer-card sticker" aria-labelledby="todayTitle">
+      <div class="row">
+        <h2 id="todayTitle">Today's fruit stick</h2>
+        <button class="chip" id="demoSteps" type="button">Demo +500</button>
+      </div>
+      <p class="steps"><span class="num" id="stepsNum">3,420</span> <span class="of">of <span id="goalNum">6,000</span> steps</span></p>
+      <div class="skewer" id="skewer" role="img" aria-label="3 of 6 fruits picked"></div>
+      <p class="caption" id="skewerCaption">3 fruits picked. 580 steps to the next one.</p>
+    </section>
+
+    <button class="egg-card sticker" id="eggCard" type="button">
+      <span class="egg" id="homeEgg"></span>
+      <span class="egg-text">
+        <strong id="eggTitle">Mystery egg</strong>
+        <span id="eggLeft">Walk 0.8 km more to hatch it</span>
+        <span class="bar mint" aria-hidden="true"><span id="eggBar"></span></span>
+      </span>
+      <span class="go" data-icon="chevron"></span>
+    </button>
+  </main>
+
+  <!-- PETS -->
+  <main class="screen" id="screen-pets" data-screen="pets" hidden>
+    <section class="viewer sticker" aria-labelledby="petName">
+      <div class="viewer-stage"><div class="canvas" id="petStage"></div></div>
+      <div class="viewer-info">
+        <div class="row">
+          <h2 id="petName">Kallie</h2>
+          <span class="rarity" id="petRarity">Common</span>
+        </div>
+        <p class="species" id="petSpecies">Smooth-coated otter</p>
+        <p class="fact" id="petFact"></p>
+        <button class="btn-soft" id="buddyBtn" type="button">Make buddy</button>
+      </div>
+    </section>
+
+    <section aria-labelledby="eggsTitle">
+      <div class="row section-head"><h2 id="eggsTitle">Eggs</h2><span class="muted" id="eggCount">1 of 3</span></div>
+      <div class="egg-row" id="eggRow"></div>
+    </section>
+
+    <section aria-labelledby="collTitle">
+      <div class="row section-head"><h2 id="collTitle">Collection</h2><span class="muted" id="collCount">1 of 7</span></div>
+      <div class="pet-grid" id="petGrid"></div>
+    </section>
+  </main>
+
+  <!-- SHOP -->
+  <main class="screen" id="screen-shop" data-screen="shop" hidden>
+    <section class="dressing sticker" aria-labelledby="tryName">
+      <div class="dress-stage"><div class="canvas" id="dressStage"></div><p class="hint">Drag to turn</p></div>
+      <div class="dress-bar">
+        <span class="dress-info"><strong id="tryName">Your look</strong><span class="muted" id="tryNote">Tap something to try it on</span></span>
+        <button class="btn-main" id="tryBtn" type="button" hidden>Wear</button>
+      </div>
+    </section>
+    <div class="seg" id="shopTabs" role="tablist" aria-label="Shop sections"></div>
+    <div class="item-grid" id="shopGrid"></div>
+    <p class="fine">Coins come from walking and quests. No real money, ever.</p>
+  </main>
+
+  <!-- QUESTS -->
+  <main class="screen" id="screen-quests" data-screen="quests" hidden>
+    <section class="streak-card sticker" aria-labelledby="streakTitle">
+      <div class="row"><h2 id="streakTitle">7 days in a row!</h2><button class="chip" id="questDemo" type="button">Demo: finish today</button></div>
+      <p class="muted" id="streakLine">Awesome walking!</p>
+      <ol class="streak-days" id="streakDays"></ol>
+    </section>
+    <section aria-labelledby="dailyTitle">
+      <div class="row section-head"><h2 id="dailyTitle">Today's quests</h2><span class="muted">New every day</span></div>
+      <ul class="quest-list sticker" id="dailyList"></ul>
+    </section>
+    <section aria-labelledby="weeklyTitle">
+      <div class="row section-head"><h2 id="weeklyTitle">This week</h2><span class="muted">Resets on Monday</span></div>
+      <ul class="quest-list sticker" id="weeklyList"></ul>
+    </section>
+    <section aria-labelledby="badgeTitle">
+      <div class="row section-head"><h2 id="badgeTitle">Badges</h2><span class="muted" id="badgeCount"></span></div>
+      <ul class="badge-grid" id="badgeGrid"></ul>
+    </section>
+  </main>
+
+  <!-- RANKS -->
+  <main class="screen" id="screen-ranks" data-screen="ranks" hidden>
+    <div class="seg" id="rankTabs" role="tablist" aria-label="Leaderboard">
+      <button type="button" role="tab" data-b="class">Class</button>
+      <button type="button" role="tab" data-b="school">School</button>
+      <button type="button" role="tab" data-b="sg">Singapore</button>
+    </div>
+    <section class="rank-hero sticker" id="rankHero" aria-live="polite"></section>
+    <section class="award sticker" aria-labelledby="awardTitle">
+      <h2 id="awardTitle">Half-year awards</h2>
+      <p>Every June and November, the top 3 walkers in each class, the top class in each school and the top 10 schools get a certificate and a badge.</p>
+    </section>
+    <section aria-labelledby="rankUnit">
+      <div class="row section-head"><h2 id="rankUnit">Steps this week</h2><span class="muted">Demo names</span></div>
+      <ol class="rank-list sticker" id="rankList"></ol>
+    </section>
+    <p class="fine">Only nickname, avatar and steps are ever shown.</p>
+  </main>
+
+  <!-- ME (profile + friends) -->
+  <main class="screen" id="screen-me" data-screen="me" hidden>
+    <div class="sub-head"><button class="back chip" id="meBack" type="button"><span data-icon="back"></span>Back</button><h2>Me</h2></div>
+    <section class="me-card sticker" aria-labelledby="meName">
+      <img class="me-av" id="meAvatar" alt="Your avatar">
+      <div class="me-info">
+        <h2 id="meName">Wei Jie</h2>
+        <p class="muted" id="meSub"></p>
+        <div class="me-stats" id="meStats"></div>
+      </div>
+    </section>
+    <section aria-labelledby="meBadgeTitle">
+      <div class="row section-head"><h2 id="meBadgeTitle">My badges</h2></div>
+      <ul class="badge-row" id="meBadges"></ul>
+    </section>
+    <section aria-labelledby="cheerTitle">
+      <div class="row section-head"><h2 id="cheerTitle">Cheers for you</h2></div>
+      <ul class="cheer-list sticker" id="cheersIn"></ul>
+    </section>
+    <section aria-labelledby="friendTitle">
+      <div class="row section-head"><h2 id="friendTitle">Friends <span class="muted" id="friendCount"></span></h2><button class="chip" id="addFriend" type="button">Add friend</button></div>
+      <div class="friend-grid" id="friendGrid"></div>
+      <p class="fine">Friends are added in person by QR code. No chat, only cheers.</p>
+    </section>
+    <section class="parent-card sticker" aria-labelledby="parentTitle">
+      <span class="pc-ico" data-icon="shield"></span>
+      <span><strong id="parentTitle">For parents</strong><span class="muted small">In the real app this is on the parent's own phone.</span></span>
+      <button class="btn-soft sm" id="openParent" type="button">Parent view</button>
+    </section>
+  </main>
+
+  <!-- PARENT VIEW -->
+  <main class="screen parent" id="screen-parent" data-screen="parent" hidden>
+    <div class="sub-head"><button class="back chip" id="parentBack" type="button"><span data-icon="back"></span>Back</button><h2>Parent view</h2><span class="tag">Demo</span></div>
+    <section class="p-status sticker" id="parentStatus"></section>
+    <section class="map-card sticker" aria-labelledby="mapTitle">
+      <div class="row"><h2 id="mapTitle">Last walk</h2><span class="legend"><i class="lg-path"></i>Route <i class="lg-zone"></i>Safe zone <i class="lg-danger"></i>Take care</span></div>
+      <div class="map" id="parentMap" role="img" aria-label="Map of the last walk, the safe zone and spots to take care"></div>
+      <p class="muted small">Location is only shared during walks. Take-care spots are placed by hand for this demo; the real app would use data.gov.sg.</p>
+    </section>
+    <section class="p-block sticker" aria-labelledby="safeTitle">
+      <h2 id="safeTitle">Safe distance</h2>
+      <p class="muted small">The phone warns your child and you if they walk further than this from where the walk started.</p>
+      <div class="seg" id="safeSeg">
+        <button type="button" data-km="0.5">0.5 km</button>
+        <button type="button" data-km="1">1 km</button>
+        <button type="button" data-km="1.5">1.5 km</button>
+      </div>
+    </section>
+    <section class="p-block sticker" aria-labelledby="alertTitle">
+      <h2 id="alertTitle">Alerts</h2>
+      <ul class="alert-list" id="alertList"></ul>
+    </section>
+    <section class="p-block sticker" aria-labelledby="weekTitle">
+      <h2 id="weekTitle">Steps this week</h2>
+      <ol class="week-bars" id="weekBars"></ol>
+    </section>
+  </main>
+
+  <div class="dock" id="dock">
+    <button class="walk-btn" id="walkBtn" type="button"><span data-icon="feet"></span>Start walk</button>
+    <nav class="tabs sticker" aria-label="Main">
+      <button class="tab on" type="button" data-tab="home" aria-current="page"><span class="ti" data-icon="home"></span>Home</button>
+      <button class="tab" type="button" data-tab="pets"><span class="ti" data-icon="pets"></span>Pets</button>
+      <button class="tab" type="button" data-tab="shop"><span class="ti" data-icon="shop"></span>Shop</button>
+      <button class="tab" type="button" data-tab="quests"><span class="ti" data-icon="quests"></span>Quests</button>
+      <button class="tab" type="button" data-tab="ranks"><span class="ti" data-icon="ranks"></span>Ranks</button>
+    </nav>
+  </div>
+
+  <!-- WALK (full screen) -->
+  <section class="walk" id="walk" hidden aria-labelledby="walkTitle">
+    <header class="walk-top">
+      <h2 id="walkTitle">Walk</h2>
+      <span class="status" id="walkStatus">Starting</span>
+    </header>
+    <div class="alert" id="walkAlert" hidden></div>
+
+    <div class="walk-main">
+      <p class="walk-steps"><span class="num" id="wSteps">0</span><span class="unit">steps</span></p>
+      <div class="walk-stats">
+        <div><span class="num" id="wTime">0:00</span><span>time</span></div>
+        <div><span class="num" id="wDist">0.00</span><span>km</span></div>
+        <div><span class="num" id="wCoins">0</span><span>coins</span></div>
+      </div>
+      <div class="walk-eggs" id="wEggs"></div>
+      <p class="safe" id="wSafe"></p>
+    </div>
+
+    <div class="walk-demo">
+      <button class="chip" id="wDemoSteps" type="button">Demo +100 steps</button>
+      <button class="chip" id="wDemoFar" type="button">Demo: walk too far</button>
+    </div>
+
+    <div class="walk-bottom">
+      <button class="sos" id="sosBtn" type="button" aria-describedby="sosHint"><span class="sos-ring" aria-hidden="true"></span>SOS</button>
+      <button class="walk-btn end" id="endBtn" type="button">End walk</button>
+    </div>
+    <p class="sos-hint" id="sosHint">Hold SOS for 2 seconds in an emergency</p>
+  </section>
+
+  <!-- Sheets (egg found, hatch, walk summary, SOS) -->
+  <div class="scrim" id="scrim" hidden></div>
+  <section class="sheet sticker" id="sheet" hidden role="dialog" aria-modal="true" aria-labelledby="sheetTitle">
+    <div id="sheetBody"></div>
+  </section>
+
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
+</div>
+<script>
+  // Stepsy needs iOS 16.4+ (import maps). Older phones get a friendly message instead of a blank screen.
+  if (!(window.HTMLScriptElement && HTMLScriptElement.supports && HTMLScriptElement.supports('importmap'))) {
+    document.getElementById('app').innerHTML = '<p style="padding:40px 24px;font-size:20px;text-align:center">Please update your phone (iPhone: iOS 16.4 or newer) to play Stepsy.</p>';
+  }
+</script>
+<script type="module" src="app.js"></script>
+</body>
+</html>
