@@ -30,69 +30,206 @@ const put = (parent, mesh, x, y, z, rx = 0, ry = 0, rz = 0) => {
   mesh.position.set(x, y, z); mesh.rotation.set(rx, ry, rz); parent.add(mesh); return mesh;
 };
 
-// Hats are drawn in "head units": the head is 1 wide, the hat sits on y = 0 (top of the head), front is +z.
+// Hats are drawn in "head units": the head is 1 wide, y = 0 is a little under the top of the head (the top is at
+// about y = 0.11), front is +z. Hats wrap down over the top of the head so they sit ON it instead of floating like
+// a lid, and nothing comes below about y = -0.2 so the eyes stay clear.
 const HATS = {
   'cap-berry': () => cap('#D42A45', '#FFFFFF'),
   'cap-sky': () => cap('#5D7FE0', '#FFD44F'),
   bucket: () => {
     const g = new THREE.Group();
-    put(g, rbox(1.36, 0.1, 1.36, '#FFD44F', 0.05), 0, 0.02, 0);
-    put(g, rbox(0.98, 0.34, 0.98, '#FFD44F', 0.1), 0, 0.2, 0);
-    put(g, rbox(1.0, 0.09, 1.0, '#FF9F45', 0.03), 0, 0.1, 0);
+    put(g, rbox(1.1, 0.4, 1.1, '#FFD44F', 0.16), 0, 0.04, 0);
+    put(g, rbox(1.13, 0.1, 1.13, '#FF9F45', 0.04), 0, -0.08, 0);
+    put(g, rbox(1.52, 0.07, 1.52, '#FFD44F', 0.035), 0, -0.17, 0);
     return g;
   },
   strawberry: () => {
     const g = new THREE.Group();
-    put(g, rbox(1.06, 0.42, 1.06, '#EF3E5C', 0.16), 0, 0.17, 0);
-    put(g, rbox(0.84, 0.18, 0.84, '#EF3E5C', 0.08), 0, 0.42, 0);
-    const seed = '#FFE07A';
-    [[-0.3, 0.2], [0.05, 0.28], [0.32, 0.16], [-0.12, 0.08], [0.22, 0.34]].forEach(([x, y]) => put(g, rbox(0.07, 0.07, 0.04, seed, 0.02), x, y, 0.54));
-    [[-0.54, 0.2, 0.2], [0.54, 0.24, -0.15]].forEach(([x, y, z]) => put(g, rbox(0.04, 0.07, 0.07, seed, 0.02), x, y, z));
+    const red = '#EF3E5C', seed = '#FFE07A';
+    put(g, rbox(1.12, 0.46, 1.12, red, 0.2), 0, 0.02, 0);
+    put(g, rbox(0.82, 0.16, 0.82, red, 0.08), 0, 0.28, 0);
+    [[-0.3, 0.06], [0.04, 0.16], [0.3, 0.02], [-0.12, -0.1], [0.2, -0.12]].forEach(([x, y]) => put(g, rbox(0.07, 0.07, 0.04, seed, 0.02), x, y, 0.57));
+    [[-0.57, 0.08, 0.2], [-0.57, -0.08, -0.2], [0.57, 0.1, -0.15], [0.57, -0.06, 0.22]].forEach(([x, y, z]) => put(g, rbox(0.04, 0.07, 0.07, seed, 0.02), x, y, z));
     for (let i = 0; i < 5; i++) {
       const a = (i / 5) * Math.PI * 2;
-      put(g, rbox(0.34, 0.08, 0.16, '#5CC489', 0.04), Math.sin(a) * 0.22, 0.53, Math.cos(a) * 0.22, 0, a + Math.PI / 2, 0.25);
+      put(g, rbox(0.32, 0.07, 0.15, '#5CC489', 0.03), Math.sin(a) * 0.2, 0.38, Math.cos(a) * 0.2, 0, a + Math.PI / 2, 0.22);
     }
-    put(g, rbox(0.08, 0.22, 0.08, '#3FA874', 0.03), 0, 0.64, 0);
+    put(g, rbox(0.08, 0.2, 0.08, '#3FA874', 0.03), 0, 0.48, 0);
     return g;
   },
-  ears: () => {
-    const g = new THREE.Group();
-    put(g, rbox(1.04, 0.1, 0.16, '#8A5A3C', 0.04), 0, 0.03, 0);
-    [-0.36, 0.36].forEach((x) => {
-      put(g, rbox(0.3, 0.26, 0.14, '#8A5A3C', 0.08), x, 0.18, 0);
-      put(g, rbox(0.17, 0.14, 0.05, '#E9B48F', 0.04), x, 0.17, 0.07);
-    });
-    return g;
-  },
+  ears: () => headband('#8A5A3C', (g, x) => {
+    put(g, rbox(0.34, 0.3, 0.15, '#8A5A3C', 0.11), x, 0.2, 0);
+    put(g, rbox(0.19, 0.16, 0.05, '#E9B48F', 0.06), x, 0.19, 0.08);
+  }),
+  cat: () => headband('#2B1710', (g, x) => {
+    const tilt = x < 0 ? 0.2 : -0.2;
+    // A flat triangle ear: a 3-sided cone squashed front to back.
+    const ear = put(g, new THREE.Mesh(new THREE.ConeGeometry(0.22, 0.32, 3, 1), mat('#2B1710')), x, 0.22, 0, 0, 0, tilt);
+    ear.scale.set(1, 1, 0.35);
+    const inner = put(g, new THREE.Mesh(new THREE.ConeGeometry(0.12, 0.18, 3, 1), mat('#F7A9B8')), x * 0.98, 0.19, 0.045, 0, 0, tilt);
+    inner.scale.set(1, 1, 0.3);
+  }),
   party: () => {
     const g = new THREE.Group();
-    const cone = new THREE.Mesh(new THREE.ConeGeometry(0.34, 0.8, 4, 1), mat('#A98BEA'));
-    cone.rotation.y = Math.PI / 4; cone.castShadow = true;
-    put(g, cone, 0.06, 0.4, 0, 0, 0, -0.12);
-    put(g, rbox(0.16, 0.16, 0.16, '#FFD44F', 0.06), 0.15, 0.83, 0);
-    [[0.12, 0.2], [-0.06, 0.42]].forEach(([y, s]) => put(g, rbox(0.44 - y * 0.6, 0.07, 0.44 - y * 0.6, '#FFFFFF', 0.03), 0.06 + s * 0.05, y + 0.06, 0, 0, Math.PI / 4, -0.12));
+    const cone = new THREE.Mesh(new THREE.ConeGeometry(0.36, 0.82, 4, 1), mat('#A98BEA'));
+    cone.castShadow = true;
+    put(g, cone, 0.06, 0.5, 0, 0, Math.PI / 4, -0.12);
+    put(g, rbox(0.17, 0.17, 0.17, '#FFD44F', 0.07), 0.16, 0.94, 0);
+    put(g, rbox(0.56, 0.05, 0.56, '#8E6FD8', 0.025), 0.03, 0.12, 0, 0, Math.PI / 4, -0.12);
     return g;
   },
   crown: () => {
     const g = new THREE.Group();
-    put(g, rbox(1.02, 0.1, 1.02, '#5FBF88', 0.04), 0, 0.03, 0);
-    const cols = ['#FFFFFF', '#FFD44F', '#EF3E5C', '#A98BEA', '#FFFFFF', '#FF9F45', '#FFD44F', '#EF3E5C'];
-    cols.forEach((c, i) => {
-      const a = (i / cols.length) * Math.PI * 2;
-      const x = Math.sin(a) * 0.5, z = Math.cos(a) * 0.5;
-      put(g, rbox(0.2, 0.2, 0.08, c, 0.07), x, 0.12, z, 0, a, 0.6);
-      put(g, rbox(0.07, 0.07, 0.1, '#FFD44F', 0.03), x * 1.02, 0.12, z * 1.02, 0, a, 0);
+    const vine = '#5FBF88';
+    // A square ring that hugs the (square) head, with flowers facing out all round.
+    [[0, 0.56, 1.12, 0.09], [0, -0.56, 1.12, 0.09], [0.56, 0, 0.09, 1.12], [-0.56, 0, 0.09, 1.12]]
+      .forEach(([x, z, w, d]) => put(g, rbox(w, 0.09, d, vine, 0.04), x, 0.02, z));
+    [
+      [-0.34, 0.6, 0, '#FFFFFF'], [0, 0.6, 0, '#EF3E5C'], [0.34, 0.6, 0, '#A98BEA'],
+      [0.6, 0.24, Math.PI / 2, '#FFFFFF'], [0.6, -0.24, Math.PI / 2, '#FF9F45'],
+      [-0.6, 0.24, -Math.PI / 2, '#EF3E5C'], [-0.6, -0.24, -Math.PI / 2, '#FFFFFF'],
+      [-0.28, -0.6, Math.PI, '#FF9F45'], [0.28, -0.6, Math.PI, '#A98BEA'],
+    ].forEach(([x, z, ry, col]) => {
+      const f = new THREE.Group();
+      f.position.set(x, 0.07, z); f.rotation.y = ry;
+      [0, 1, 2, 3].forEach((k) => put(f, rbox(0.12, 0.12, 0.05, col, 0.05), Math.cos(k * Math.PI / 2) * 0.075, Math.sin(k * Math.PI / 2) * 0.075, 0));
+      put(f, rbox(0.09, 0.09, 0.07, '#FFD44F', 0.04), 0, 0, 0.02);
+      g.add(f);
     });
+    return g;
+  },
+  beanie: () => {
+    const g = new THREE.Group();
+    put(g, rbox(1.12, 0.42, 1.12, '#5FBF88', 0.2), 0, 0.06, 0);
+    put(g, rbox(1.16, 0.16, 1.16, '#3FA874', 0.06), 0, -0.13, 0);
+    put(g, rbox(0.36, 0.34, 0.36, '#FFFFFF', 0.16), 0, 0.4, 0);
+    return g;
+  },
+  frog: () => {
+    const g = new THREE.Group();
+    const green = '#7FD8A6';
+    put(g, rbox(1.12, 0.4, 1.12, green, 0.2), 0, 0.04, 0);
+    put(g, rbox(1.15, 0.08, 1.15, '#3FA874', 0.03), 0, -0.15, 0);
+    [-0.3, 0.3].forEach((x) => {
+      put(g, rbox(0.3, 0.26, 0.28, green, 0.12), x, 0.3, 0.26);
+      put(g, rbox(0.18, 0.17, 0.06, '#FFFFFF', 0.07), x, 0.31, 0.41);
+      put(g, rbox(0.09, 0.1, 0.04, '#2B1710', 0.03), x, 0.3, 0.45);
+    });
+    put(g, rbox(0.36, 0.05, 0.04, '#E5536E', 0.02), 0, 0.02, 0.57);
+    [-0.38, 0.38].forEach((x) => put(g, rbox(0.12, 0.07, 0.04, '#F7A9B8', 0.03), x, -0.02, 0.565));
+    return g;
+  },
+  chef: () => {
+    const g = new THREE.Group();
+    put(g, rbox(1.1, 0.3, 1.1, '#FFFFFF', 0.08), 0, -0.04, 0);
+    put(g, rbox(1.22, 0.34, 1.22, '#FFFFFF', 0.17), 0, 0.26, 0);
+    [[-0.27, 0], [0.27, 0], [0, 0.27], [0, -0.27]].forEach(([x, z]) => put(g, rbox(0.5, 0.3, 0.5, '#FFF6EF', 0.15), x, 0.44, z));
+    put(g, rbox(0.54, 0.3, 0.54, '#FFFFFF', 0.15), 0, 0.54, 0);
+    return g;
+  },
+  durian: () => {
+    const g = new THREE.Group();
+    put(g, rbox(1.12, 0.46, 1.12, '#B8A23A', 0.18), 0, 0.04, 0);
+    put(g, rbox(0.8, 0.14, 0.8, '#B8A23A', 0.06), 0, 0.3, 0);
+    const spike = (x, y, z, rx, rz) => put(g, new THREE.Mesh(new THREE.ConeGeometry(0.07, 0.15, 4, 1), mat('#8E7A22')), x, y, z, rx, 0, rz);
+    [-0.32, 0, 0.32].forEach((a) => [-0.08, 0.14].forEach((y) => {
+      spike(a, y, 0.6, Math.PI / 2, 0); spike(a, y, -0.6, -Math.PI / 2, 0);
+      spike(0.6, y, a, 0, -Math.PI / 2); spike(-0.6, y, a, 0, Math.PI / 2);
+    }));
+    [[-0.22, -0.22], [0.22, -0.22], [-0.22, 0.22], [0.22, 0.22]].forEach(([x, z]) => spike(x, 0.42, z, 0, 0));
+    put(g, rbox(0.1, 0.2, 0.1, '#6B5A1A', 0.03), 0, 0.46, 0);
     return g;
   },
 };
 function cap(main, trim) {
   const g = new THREE.Group();
-  put(g, rbox(1.04, 0.26, 1.04, main, 0.12), 0, 0.1, 0);
-  put(g, rbox(0.86, 0.06, 0.32, main, 0.03), 0, 0.01, 0.6);
-  put(g, rbox(0.16, 0.06, 0.16, trim, 0.03), 0, 0.25, 0);
-  put(g, rbox(0.44, 0.15, 0.05, trim, 0.04), 0, 0.12, 0.52);
+  put(g, rbox(1.1, 0.4, 1.1, main, 0.17), 0, 0.02, 0);
+  put(g, rbox(0.98, 0.065, 0.5, main, 0.03), 0, -0.15, 0.74, 0.14, 0, 0);
+  put(g, rbox(0.46, 0.18, 0.04, trim, 0.04), 0, 0.02, 0.56);
+  put(g, rbox(0.16, 0.07, 0.16, trim, 0.03), 0, 0.24, 0);
   return g;
+}
+// A band over the top of the head and down both sides, with something on top (ears).
+function headband(color, addEar) {
+  const g = new THREE.Group();
+  put(g, rbox(1.1, 0.07, 0.16, color, 0.03), 0, 0.05, 0);
+  [-0.55, 0.55].forEach((x) => put(g, rbox(0.07, 0.26, 0.16, color, 0.03), x, -0.06, 0));
+  [-0.34, 0.34].forEach((x) => addEar(g, x));
+  return g;
+}
+
+// Glasses: 'glasses' and 'sunglasses' are Kenney models; the rest are built here at the same size and spot
+// (about 0.33 wide, standing on y = 0, lenses at the front around z = 0.08, arms going back).
+const lens = (c, opacity = 0.85) => new THREE.MeshStandardMaterial({ color: c, roughness: 0.25, metalness: 0, transparent: opacity < 1, opacity });
+const EYES = {
+  round: () => {
+    const g = new THREE.Group();
+    [-0.08, 0.08].forEach((x) => {
+      put(g, new THREE.Mesh(new THREE.TorusGeometry(0.052, 0.012, 6, 16), mat('#D42A45', 0.4)), x, 0.05, 0.08);
+      put(g, new THREE.Mesh(new THREE.CircleGeometry(0.05, 16), lens('#DDEFFF', 0.4)), x, 0.05, 0.078);
+    });
+    put(g, rbox(0.06, 0.014, 0.014, '#D42A45', 0.005), 0, 0.06, 0.08);
+    arms(g, '#D42A45');
+    return g;
+  },
+  heart: () => shapeShades('#FF6FA0', '#7A1F44', heartShape()),
+  star: () => shapeShades('#FFD44F', '#3B2A6B', starShape()),
+  goggles: () => {
+    const g = new THREE.Group();
+    [-0.075, 0.075].forEach((x) => {
+      put(g, rbox(0.12, 0.085, 0.05, '#2F7FD8', 0.03), x, 0.05, 0.07);
+      put(g, new THREE.Mesh(new THREE.BoxGeometry(0.095, 0.06, 0.02), lens('#9EE6FF', 0.75)), x, 0.05, 0.1);
+    });
+    put(g, rbox(0.04, 0.03, 0.03, '#2F7FD8', 0.01), 0, 0.055, 0.075);
+    [-0.15, 0.15].forEach((x) => put(g, rbox(0.03, 0.045, 0.2, '#5DBBF0', 0.015), x, 0.05, -0.02));
+    return g;
+  },
+  '3d': () => {
+    const g = new THREE.Group();
+    put(g, rbox(0.33, 0.1, 0.03, '#FFFFFF', 0.02), 0, 0.05, 0.08);
+    [[-0.08, '#E5303C'], [0.08, '#2D7BE5']].forEach(([x, c]) => put(g, new THREE.Mesh(new THREE.BoxGeometry(0.11, 0.065, 0.02), lens(c, 0.9)), x, 0.05, 0.095));
+    arms(g, '#FFFFFF');
+    return g;
+  },
+};
+function arms(g, color) {
+  [-0.16, 0.16].forEach((x) => put(g, rbox(0.016, 0.02, 0.18, color, 0.006), x, 0.065, -0.01));
+}
+function shapeShades(frame, glass, shape) {
+  const g = new THREE.Group();
+  const geo = new THREE.ExtrudeGeometry(shape, { depth: 0.02, bevelEnabled: false });
+  geo.center();
+  const inner = new THREE.ExtrudeGeometry(shape, { depth: 0.022, bevelEnabled: false });
+  inner.center(); inner.scale(0.72, 0.72, 1);
+  [-0.085, 0.085].forEach((x) => {
+    put(g, new THREE.Mesh(geo, mat(frame, 0.4)), x, 0.05, 0.08);
+    put(g, new THREE.Mesh(inner, lens(glass, 0.92)), x, 0.05, 0.085);
+  });
+  put(g, rbox(0.05, 0.014, 0.014, frame, 0.005), 0, 0.065, 0.08);
+  arms(g, frame);
+  return g;
+}
+function heartShape() {
+  const s = new THREE.Shape(), k = 0.0105;
+  s.moveTo(0, -5 * k);
+  s.bezierCurveTo(-1 * k, -3.5 * k, -6 * k, -1 * k, -6 * k, 2 * k);
+  s.bezierCurveTo(-6 * k, 5 * k, -2 * k, 6 * k, 0, 3 * k);
+  s.bezierCurveTo(2 * k, 6 * k, 6 * k, 5 * k, 6 * k, 2 * k);
+  s.bezierCurveTo(6 * k, -1 * k, 1 * k, -3.5 * k, 0, -5 * k);
+  return s;
+}
+function starShape() {
+  const s = new THREE.Shape();
+  for (let i = 0; i < 10; i++) {
+    const r = i % 2 ? 0.03 : 0.068, a = Math.PI / 2 + (i * Math.PI) / 5;
+    if (i) s.lineTo(Math.cos(a) * r, Math.sin(a) * r); else s.moveTo(Math.cos(a) * r, Math.sin(a) * r);
+  }
+  return s;
+}
+// The glasses for an id: built here, or a Kenney model.
+export async function makeEyes(id) {
+  if (EYES[id]) { const g = EYES[id](); g.traverse((o) => { if (o.isMesh) o.castShadow = true; }); return g; }
+  return (await loadGLB(`aid-${id}.glb`)).scene.clone();
 }
 // ---------- Things to hold (right hand) ----------
 // Drawn in "head units" like the hats: the grip is at the origin and the thing points up (+y), front is +z.
@@ -330,7 +467,7 @@ export async function buildAvatar(outfit = DEFAULT_OUTFIT) {
       }
     }
     if (o.eyes) {
-      const g = (await loadGLB(`aid-${o.eyes}.glb`)).scene.clone();
+      const g = await makeEyes(o.eyes);
       g.position.set(hm.center.x, hm.center.y - hm.height * 0.2, hm.center.z + hm.front - 0.09);
       head.add(g);
     }
@@ -436,7 +573,7 @@ export async function itemPicture(kind, id, size = 160) {
     let obj;
     if (kind === 'hat') obj = makeHat(id);
     else if (kind === 'hold') obj = makeHold(id);
-    else if (kind === 'eyes') obj = (await loadGLB(`aid-${id}.glb`)).scene.clone();
+    else if (kind === 'eyes') obj = await makeEyes(id);
     else obj = (await loadGLB(id === 'hearing' ? 'aid_hearing.glb' : `${id}.glb`)).scene.clone();
     return snapshot(obj, { size, yaw: kind === 'hat' ? 0.5 : 0.6, pad: 1.9, lift: 0.5 });
   })();

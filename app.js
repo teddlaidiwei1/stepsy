@@ -101,11 +101,14 @@ function addXp(n) {
 }
 function save() { try { localStorage.setItem('stepsy', JSON.stringify(state)); } catch {} document.dispatchEvent(new Event('stepsy-saved')); }
 const uid = () => Math.random().toString(36).slice(2, 9);
-const eggGoal = (egg) => RARITY[egg.rarity].km;
-const eggReady = (egg) => egg.km >= eggGoal(egg);
 // Eggs are walked in km inside the app, but kids see steps (about 1,800 steps per km).
 const kmSteps = (km) => Math.round(km / 0.00055 / 100) * 100;
-const eggSteps = (egg) => `${fmt(kmSteps(egg.km))} / ${fmt(kmSteps(eggGoal(egg)))} steps`;
+// The goal is the round number of steps kids SEE (1 km shows as 1,800 steps), so the egg hatches exactly when the
+// bar says 1,800 / 1,800. (It used to need 1,818 real steps, and progress was rounded up, so it looked full but wasn't.)
+const eggGoal = (egg) => kmSteps(RARITY[egg.rarity].km) * 0.00055;
+const eggReady = (egg) => egg.km >= eggGoal(egg) - 1e-6;
+const stepsDone = (km) => Math.floor(km / 0.00055 / 100 + 1e-6) * 100;
+const eggSteps = (egg) => `${fmt(eggReady(egg) ? kmSteps(eggGoal(egg)) : stepsDone(egg.km))} / ${fmt(kmSteps(eggGoal(egg)))} steps`;
 
 // ---------------- Static art ----------------
 document.querySelectorAll('[data-icon]').forEach((el) => { el.innerHTML = ICONS[el.dataset.icon]; });
@@ -210,7 +213,7 @@ function renderHomeEgg() {
   $('eggTitle').textContent = `${r.label} egg${state.eggs.length > 1 ? ` (+${state.eggs.length - 1} more)` : ''}`;
   const left = eggGoal(egg) - egg.km;
   $('eggLeft').textContent = eggReady(egg) ? 'Ready to hatch! Tap to open' : `Walk ${fmt(Math.max(100, kmSteps(left)))} more steps to hatch it`;
-  $('eggBar').style.width = `${(egg.km / eggGoal(egg)) * 100}%`;
+  $('eggBar').style.width = `${Math.min(egg.km / eggGoal(egg), 1) * 100}%`;
   card.dataset.egg = egg.id;
   card.classList.toggle('ready', eggReady(egg));
 }
@@ -423,7 +426,7 @@ function renderPets() {
       <strong>${r.label}</strong>
       ${ready
         ? `<button class="btn-main sm" type="button">Hatch</button>`
-        : `<span class="km num">${eggSteps(egg)}</span><span class="bar mint" aria-hidden="true"><span style="width:${(egg.km / eggGoal(egg)) * 100}%"></span></span>`}`;
+        : `<span class="km num">${eggSteps(egg)}</span><span class="bar mint" aria-hidden="true"><span style="width:${Math.min(egg.km / eggGoal(egg), 1) * 100}%"></span></span>`}`;
     tile.querySelector('button')?.addEventListener('click', () => hatch(egg.id));
     row.appendChild(tile);
   });
@@ -639,7 +642,7 @@ function renderWalk() {
   const eggs = $('wEggs');
   eggs.innerHTML = state.eggs.map((egg) => {
     const r = RARITY[egg.rarity];
-    return `<div class="w-egg"><span class="egg">${eggArt(r.egg)}</span><span class="bar mint" aria-hidden="true"><span style="width:${(egg.km / eggGoal(egg)) * 100}%"></span></span><span class="num">${eggReady(egg) ? 'Ready!' : eggSteps(egg)}</span></div>`;
+    return `<div class="w-egg"><span class="egg">${eggArt(r.egg)}</span><span class="bar mint" aria-hidden="true"><span style="width:${Math.min(egg.km / eggGoal(egg), 1) * 100}%"></span></span><span class="num">${eggReady(egg) ? 'Ready!' : eggSteps(egg)}</span></div>`;
   }).join('') || '<p class="muted">Walk on to find an egg</p>';
   if (walk.start && walk.lastFix) {
     const away = haversineKm(walk.start, walk.lastFix);
