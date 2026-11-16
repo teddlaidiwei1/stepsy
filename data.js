@@ -1,12 +1,14 @@
 // Shop items, quests, badges and the demo people. Every person, class and school here is made up.
 // School names checked by Gemini Hydrogen (16 Nov 2026) as not matching a real Singapore primary school.
 
-export const LOOKS = [
+const BASE_LOOKS = [
   'male-a', 'female-a', 'male-b', 'female-b', 'male-e', 'female-c',
   'male-f', 'female-e', 'male-d', 'female-d', 'male-c', 'female-f',
 ];
+// 36 looks: each base character plus two recoloured versions (new clothes colours, another skin tone).
+export const LOOKS = [...BASE_LOOKS, ...BASE_LOOKS.map((l) => `${l}.2`), ...BASE_LOOKS.map((l) => `${l}.3`)];
 
-// kind: hat / eyes / chair / hearing. price 0 = free. care = an aid, always free and never sold.
+// kind: hat / eyes / hold. price 0 = free. care = an aid, always free and never sold.
 export const SHOP = [
   { id: 'cap-berry', kind: 'hat', name: 'Berry cap', price: 120 },
   { id: 'cap-sky', kind: 'hat', name: 'Sky cap', price: 120 },
@@ -16,25 +18,29 @@ export const SHOP = [
   { id: 'ears', kind: 'hat', name: 'Otter ears', price: 300 },
   { id: 'crown', kind: 'hat', name: 'Flower crown', price: 350 },
   { id: 'sunglasses', kind: 'eyes', name: 'Sunglasses', price: 200 },
-  { id: 'glasses', kind: 'eyes', name: 'Glasses', price: 0, care: true },
-  { id: 'wheelchair', kind: 'chair', name: 'Wheelchair', price: 0, care: true },
-  { id: 'wheelchair-deluxe', kind: 'chair', name: 'Sporty chair', price: 0, care: true },
-  { id: 'wheelchair-power', kind: 'chair', name: 'Power chair', price: 0, care: true },
-  { id: 'hearing', kind: 'hearing', name: 'Hearing aid', price: 0, care: true },
+  { id: 'glasses', kind: 'eyes', name: 'Glasses', price: 0 },
+  { id: 'bottle', kind: 'hold', name: 'Water bottle', price: 0 },
+  { id: 'lollipop', kind: 'hold', name: 'Lollipop', price: 120 },
+  { id: 'balloon', kind: 'hold', name: 'Balloon', price: 150 },
+  { id: 'pinwheel', kind: 'hold', name: 'Pinwheel', price: 150 },
+  { id: 'bubbles', kind: 'hold', name: 'Bubble wand', price: 180 },
+  { id: 'football', kind: 'hold', name: 'Football', price: 200 },
+  { id: 'racket', kind: 'hold', name: 'Badminton racket', price: 220 },
+  { id: 'teddy', kind: 'hold', name: 'Teddy bear', price: 300 },
 ];
 
 export const SHOP_TABS = [
   { id: 'looks', label: 'Looks' },
   { id: 'hats', label: 'Hats', kinds: ['hat'] },
   { id: 'glasses', label: 'Glasses', kinds: ['eyes'] },
-  { id: 'aids', label: 'Wheels & aids', kinds: ['chair', 'hearing'] },
+  { id: 'fun', label: 'Fun stuff', kinds: ['hold'] },
 ];
 
 // Badges show on your profile and your friends' profiles.
 export const BADGES = [
   { id: 'first', name: 'First walk', color: '#C6EBFB', icon: 'feet' },
   { id: 'egg', name: 'Egg finder', color: '#FFF1C2', icon: 'egg' },
-  { id: '5k', name: '5k club', color: '#FFD0D6', icon: 'fruit' },
+  { id: '5k', name: '5k club', color: '#FFD0D6', icon: 'feet' },
   { id: 'week', name: '7-day streak', color: '#DFF6E8', icon: 'quests' },
   { id: 'collector', name: '3 pets', color: '#ECE3FF', icon: 'pets' },
   { id: 'explorer', name: '10 km', color: '#FFE1D4', icon: 'ranks' },
@@ -47,7 +53,7 @@ export const ME = { cls: '5B', school: 'Sunbird Primary', code: 'WJ-4821' };
 export const FRIENDS = [
   { id: 'f1', name: 'Aisyah', cls: '5B', outfit: { look: 'female-a', hat: 'bucket' }, buddy: 'kingfisher', pets: ['kingfisher', 'otter', 'pangolin'], badges: ['first', 'egg', '5k', 'week'], today: 4210 },
   { id: 'f2', name: 'Jun Hao', cls: '5B', outfit: { look: 'male-b', hat: 'cap-sky' }, buddy: 'monitor', pets: ['monitor', 'otter'], badges: ['first', 'egg'], today: 2980 },
-  { id: 'f3', name: 'Priya', cls: '5A', outfit: { look: 'female-e', chair: 'wheelchair-deluxe' }, buddy: 'hornbill', pets: ['hornbill', 'kingfisher', 'otter', 'mousedeer'], badges: ['first', 'egg', 'collector', 'week', 'explorer'], today: 5120 },
+  { id: 'f3', name: 'Priya', cls: '5A', outfit: { look: 'female-e' }, buddy: 'hornbill', pets: ['hornbill', 'kingfisher', 'otter', 'mousedeer'], badges: ['first', 'egg', 'collector', 'week', 'explorer'], today: 5120 },
   { id: 'f4', name: 'Kai', cls: '5C', outfit: { look: 'male-e', eyes: 'sunglasses' }, buddy: 'otter', pets: ['otter'], badges: ['first'], today: 1640 },
 ];
 // Someone you can add with the demo QR scan.

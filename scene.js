@@ -2,6 +2,7 @@
 import * as THREE from 'three';
 import { makePet, rbox } from './pets3d.js';
 import { buildAvatar, AVATAR_HEIGHT } from './avatar3d.js';
+import { play as sfx } from './sfx.js';
 
 const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
 const mat = (color) => new THREE.MeshStandardMaterial({ color, roughness: 0.65, metalness: 0 });
@@ -85,7 +86,7 @@ export function createStage(container, { outfit = null, pet = null, mode = 'home
 
   // Avatar (Home and Shop)
   const AV_YAW = dress ? 0.35 : 0.32;
-  let avatar = null, mixer = null, current = null, sitting = false, token = 0, spin = 0;
+  let avatar = null, mixer = null, current = null, sitting = false, holding = false, token = 0, spin = 0;
   let actions = {};
   function play(name, once = false) {
     const next = actions[name];
@@ -97,7 +98,7 @@ export function createStage(container, { outfit = null, pet = null, mode = 'home
     if (current) current.fadeOut(0.2);
     current = next;
   }
-  const idleName = () => (sitting ? 'wheelchair-sit' : 'idle');
+  const idleName = () => (sitting ? 'wheelchair-sit' : holding ? 'holding-right' : 'idle');
   async function setOutfit(o) {
     const my = ++token;
     const av = await buildAvatar(o);
@@ -106,6 +107,7 @@ export function createStage(container, { outfit = null, pet = null, mode = 'home
     mixer?.stopAllAction();
     avatar = av.root;
     sitting = av.sitting;
+    holding = av.holding;
     avatar.position.set(dress ? 0 : -0.72, 0, 0);
     avatar.rotation.y = AV_YAW + spin;
     scene.add(avatar);
@@ -156,8 +158,9 @@ export function createStage(container, { outfit = null, pet = null, mode = 'home
     const r = renderer.domElement.getBoundingClientRect();
     ptr.set(((e.clientX - r.left) / r.width) * 2 - 1, -((e.clientY - r.top) / r.height) * 2 + 1);
     ray.setFromCamera(ptr, camera);
-    if (petObj && ray.intersectObject(petObj, true).length) { hop.t = 0; kick(); return; }
+    if (petObj && ray.intersectObject(petObj, true).length) { hop.t = 0; sfx('pet'); kick(); return; }
     if (avatar && ray.intersectObject(avatar, true).length) {
+      sfx('avatar');
       if (sitting) play(Math.random() < 0.5 ? 'wheelchair-look-left' : 'wheelchair-look-right', true);
       else play(Math.random() < 0.5 ? 'emote-yes' : 'jump', true);
       kick();

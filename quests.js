@@ -1,6 +1,7 @@
 // Quests: daily and weekly goals that pay coins, the streak week and badges.
 // Wording checked by Gemini Hydrogen for 7-year-olds: positive, no pressure.
-import { ICONS, eggArt, fruitSVG, coinSVG } from './art.js';
+import { ICONS, eggArt, coinSVG } from './art.js';
+import { play as sfx } from './sfx.js';
 import { BADGES } from './data.js';
 
 let ctx;
@@ -43,7 +44,7 @@ const QUESTS = [
   { id: 'd-steps', when: 'day', title: 'Walk 5,000 steps today', reward: 50, art: () => ICONS.feet, prog: () => [ctx.state.steps, 5000], unit: 'steps' },
   { id: 'd-walk', when: 'day', title: 'Go on a 15-minute walk', reward: 40, art: () => ICONS.clock, prog: () => [today().mins, 15], unit: 'min' },
   { id: 'd-egg', when: 'day', title: 'Find an egg on a walk', reward: 30, art: () => eggArt(), prog: () => [today().eggs, 1] },
-  { id: 'w-days', when: 'week', title: 'Walk on 5 different days this week', reward: 120, art: () => fruitSVG(1), prog: () => [week().days, 5], unit: 'days' },
+  { id: 'w-days', when: 'week', title: 'Walk on 5 different days this week', reward: 120, art: () => ICONS.feet, prog: () => [week().days, 5], unit: 'days' },
   { id: 'w-hatch', when: 'week', title: 'Hatch a pet this week', reward: 80, art: () => ICONS.pets, prog: () => [week().hatched, 1] },
   { id: 'w-class', when: 'week', title: 'Help your class walk 20 km together', reward: 150, team: true, art: () => ICONS.ranks, prog: () => [week().classKm, 20], unit: 'km' },
 ];
@@ -64,7 +65,7 @@ export function earnedBadges() {
   return BADGES.filter((b) => got.has(b.id));
 }
 export function badgeArt(b) {
-  const inner = b.icon === 'egg' ? eggArt() : b.icon === 'fruit' ? fruitSVG(0) : ICONS[b.icon];
+  const inner = b.icon === 'egg' ? eggArt() : ICONS[b.icon];
   return `<span class="badge-art" style="--bg:${b.color}">${inner}</span>`;
 }
 // Keeps state.badges up to date and tells the kid about a new one.
@@ -126,6 +127,7 @@ export function renderQuests() {
     ctx.save();
     ctx.renderTop();
     ctx.coinBurst(btn);
+    sfx('claim');
     ctx.toast(`+${q.reward} coins!`);
     renderQuests();
     ctx.updateDots();
@@ -140,7 +142,7 @@ export function renderQuests() {
   }
   $('streakDays').innerHTML = days.map((d) => `
     <li class="${d.walked ? 'on' : ''}${d.today ? ' today' : ''}">
-      <span class="sd">${d.walked ? fruitSVG(d.fruit) : ''}</span><span class="sl">${d.today ? 'Today' : d.label}</span>
+      <span class="sd">${d.walked ? ICONS.feet : ''}</span><span class="sl">${d.today ? 'Today' : d.label}</span>
     </li>`).join('');
   $('streakTitle').textContent = state.streak > 0 ? `${state.streak} days in a row!` : 'Start a streak today';
   $('streakLine').textContent = state.streak > 0 ? 'Awesome walking!' : 'Rest days are OK. Start a new streak today!';

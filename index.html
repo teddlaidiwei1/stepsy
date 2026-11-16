@@ -48,14 +48,17 @@
       <p class="hint">Tap them</p>
     </section>
 
-    <section class="skewer-card sticker" aria-labelledby="todayTitle">
+    <section class="steps-card sticker" aria-labelledby="todayTitle">
       <div class="row">
-        <h2 id="todayTitle">Today's fruit stick</h2>
+        <h2 id="todayTitle">Today's steps</h2>
         <button class="chip" id="demoSteps" type="button">Demo +500</button>
       </div>
       <p class="steps"><span class="num" id="stepsNum">3,420</span> <span class="of">of <span id="goalNum">6,000</span> steps</span></p>
-      <div class="skewer" id="skewer" role="img" aria-label="3 of 6 fruits picked"></div>
-      <p class="caption" id="skewerCaption">3 fruits picked. 580 steps to the next one.</p>
+      <div class="goal-bar" id="goalBar" role="progressbar" aria-valuemin="0" aria-labelledby="todayTitle">
+        <span class="goal-fill" id="goalFill"></span>
+        <ol class="goal-marks" id="goalMarks" aria-hidden="true"></ol>
+      </div>
+      <p class="caption" id="goalCaption"></p>
     </section>
 
     <button class="egg-card sticker" id="eggCard" type="button">
@@ -151,7 +154,7 @@
 
   <!-- ME (profile + friends) -->
   <main class="screen" id="screen-me" data-screen="me" hidden>
-    <div class="sub-head"><button class="back chip" id="meBack" type="button"><span data-icon="back"></span>Back</button><h2>Me</h2></div>
+    <div class="sub-head"><button class="back chip" id="meBack" type="button"><span data-icon="back"></span>Back</button><h2>Me</h2><button class="chip" id="soundBtn" type="button" aria-pressed="true">Sound: on</button></div>
     <section class="me-card sticker" aria-labelledby="meName">
       <img class="me-av" id="meAvatar" alt="Your avatar">
       <div class="me-info">

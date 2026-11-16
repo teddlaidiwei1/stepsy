@@ -1,5 +1,6 @@
 import { createStage, petPortrait } from './scene.js';
-import { fruitSVG, emptySlot, eggArt, coinSVG, ICONS } from './art.js';
+import { eggArt, coinSVG, ICONS } from './art.js';
+import { initSfx, play as sfx } from './sfx.js';
 import { PETS, PET_ORDER, RARITY, rollRarity, rollPet } from './pets.js';
 import { createStepCounter } from './stepcounter.js';
 import { DEFAULT_OUTFIT } from './avatar3d.js';
@@ -30,16 +31,17 @@ function load() {
     const s = JSON.parse(localStorage.getItem('stepsy') || 'null');
     if (!s || s.version < 2) return DEFAULTS();
     s.version = VERSION;
+    if (s.outfit) { s.outfit.chair = null; s.outfit.hearing = false; } // wheelchairs + hearing aid removed (17 Nov)
     if (s.day !== todayKey()) { s.day = todayKey(); s.steps = 0; }
     return { ...DEFAULTS(), ...s };
   } catch { return DEFAULTS(); }
 }
 const state = load();
+initSfx();
 // New day while the app stays open (e.g. installed on the home screen overnight).
 function rollDay() {
   if (state.day === todayKey()) return;
   state.day = todayKey(); state.steps = 0;
-  if (walk) walk.fruitsAtStart = 0;
   save();
 }
 function save() { try { localStorage.setItem('stepsy', JSON.stringify(state)); } catch {} }
@@ -62,9 +64,9 @@ function toast(msg) {
 }
 
 // ---------------- Progress shared by walks and the demo button ----------------
-const PER_FRUIT = 1000;
+const PER_FRUIT = 1000;  // every 1,000 steps (up to today's goal) gives coins
 const FRUIT_COINS = 20;
-// Adds steps and km. Returns coins earned from new fruits.
+// Adds steps and km. Returns coins earned from new 1,000-step marks.
 function addProgress(steps, km) {
   rollDay();
   const before = Math.floor(state.steps / PER_FRUIT);
@@ -88,40 +90,23 @@ function renderTop() {
   $('coins').textContent = fmt(state.coins);
 }
 
-// ---------------- Home: fruit stick ----------------
-let shownFruits = 0, shownSteps = 0;
-function renderSkewer(animate) {
+// ---------------- Home: today's steps bar ----------------
+let shownSteps = 0;
+function renderGoal() {
   const total = state.goal / PER_FRUIT;
-  const picked = Math.min(Math.floor(state.steps / PER_FRUIT), total);
-  const partial = picked < total ? (state.steps % PER_FRUIT) / PER_FRUIT : 0;
-  const sk = $('skewer');
-  sk.innerHTML = '';
-  for (let i = 0; i < total; i++) {
-    const slot = document.createElement('div');
-    slot.className = 'slot';
-    if (i < picked) {
-      slot.classList.add('filled');
-      slot.innerHTML = fruitSVG(i);
-      if (animate && i >= shownFruits && !reduceMotion) {
-        slot.firstElementChild.classList.add('pop');
-        slot.firstElementChild.style.animationDelay = `${(i - shownFruits) * 110}ms`;
-      }
-    } else if (i === picked && partial > 0) {
-      slot.classList.add('partial');
-      slot.style.setProperty('--fill', `${Math.round(partial * 100)}%`);
-      slot.innerHTML = `<div class="ghost">${fruitSVG(i)}</div><span class="meter"><i></i></span>`;
-    } else {
-      slot.innerHTML = emptySlot;
-    }
-    sk.appendChild(slot);
-  }
-  shownFruits = picked;
-  sk.setAttribute('aria-label', `${picked} of ${total} fruits picked`);
+  const done = Math.min(Math.floor(state.steps / PER_FRUIT), total);
+  $('goalFill').style.width = `${Math.min(state.steps / state.goal, 1) * 100}%`;
+  $('goalMarks').innerHTML = Array.from({ length: total }, (_, i) =>
+    `<li class="${i < done ? 'hit' : ''}" style="--x:${((i + 1) / total) * 100}%"><span class="mk">${coinSVG}</span><small>${i + 1}k</small></li>`).join('');
+  const bar = $('goalBar');
+  bar.setAttribute('aria-valuemax', state.goal);
+  bar.setAttribute('aria-valuenow', Math.min(state.steps, state.goal));
+  bar.setAttribute('aria-valuetext', `${fmt(state.steps)} of ${fmt(state.goal)} steps`);
   $('goalNum').textContent = fmt(state.goal);
   const left = PER_FRUIT - (state.steps % PER_FRUIT);
-  $('skewerCaption').textContent = picked >= total
-    ? "Stick complete! You hit today's goal."
-    : `${picked} ${picked === 1 ? 'fruit' : 'fruits'} picked. ${fmt(left)} steps to the next one.`;
+  $('goalCaption').textContent = done >= total
+    ? "Goal done! Great walking today."
+    : `${fmt(left)} steps to your next +${FRUIT_COINS} coins.`;
 }
 function countUp(el, from, to, done) {
   if (reduceMotion) { el.textContent = fmt(to); done?.(); return; }
@@ -172,7 +157,7 @@ function renderBuddy() {
 function renderHome(animate) {
   renderTop();
   renderSteps();
-  renderSkewer(animate);
+  renderGoal();
   renderHomeEgg();
   renderBuddy();
 }
@@ -181,6 +166,7 @@ function renderHome(animate) {
 let sheetOnClose = null;
 function openSheet(html, { onClose, lock = false } = {}) {
   $('sheetBody').innerHTML = html;
+  if ($('sheet').hidden) sfx('open');
   $('scrim').hidden = false;
   $('sheet').hidden = false;
   $('scrim').dataset.lock = lock ? '1' : '';
@@ -189,6 +175,7 @@ function openSheet(html, { onClose, lock = false } = {}) {
   return $('sheetBody');
 }
 function closeSheet() {
+  if (!$('sheet').hidden) sfx('close');
   $('scrim').classList.remove('show');
   $('sheet').classList.remove('show');
   setTimeout(() => { $('scrim').hidden = true; $('sheet').hidden = true; $('sheetBody').innerHTML = ''; }, 220);
@@ -216,6 +203,7 @@ function hatch(eggId) {
       <p class="hatch-wait">Something is moving...</p>
     </div>`, { lock: true });
   const reveal = () => {
+    sfx('hatch');
     body.innerHTML = `
       <div class="hatch revealed">
         <div class="burst" aria-hidden="true"></div>
@@ -379,7 +367,7 @@ function applyOutfit(o) { homeStage?.setOutfit(o); }
 // ---------------- Home interactions ----------------
 $('demoSteps').addEventListener('click', () => {
   const coins = addProgress(500, 0.35);
-  if (coins) toast(`New fruit! +${coins} coins`);
+  if (coins) { sfx('mark'); toast(`1,000 more steps! +${coins} coins`); }
   renderAll(true);
   wobble($('homeEgg'));
 });
@@ -394,7 +382,7 @@ $('stepsNum').addEventListener('pointerdown', () => {
   pressTimer = setTimeout(() => {
     try { localStorage.removeItem('stepsy'); } catch {}
     Object.assign(state, DEFAULTS());
-    shownFruits = 0; shownSteps = 0; selected = state.buddy;
+    shownSteps = 0; selected = state.buddy;
     homeStage?.setPet(state.buddy);
     homeStage?.setOutfit(state.outfit);
     renderAll(true);
@@ -439,7 +427,7 @@ function creditKm(stepsAdded = 0) {
   const dKm = Math.max(km - walk.kmCredited, 0);
   walk.kmCredited = km;
   const coins = addProgress(stepsAdded, dKm);
-  if (coins) { walk.coins += coins; toast(`New fruit! +${coins} coins`); }
+  if (coins) { walk.coins += coins; sfx('mark'); toast(`1,000 more steps! +${coins} coins`); }
 }
 
 function findEgg() {
@@ -448,6 +436,7 @@ function findEgg() {
   walk.eggsFound++;
   save();
   const r = RARITY[rarity];
+  setTimeout(() => sfx('egg'), 120);
   const body = openSheet(`
     <div class="found">
       <div class="hatch-egg pop">${eggArt(r.egg)}</div>
@@ -502,6 +491,7 @@ function tooFar(demo) {
   walk.far = true;
   state.alerts.push({ at: Date.now(), kind: 'far', demo: true });
   save();
+  sfx('alert');
   showAlert(`You're outside your safe zone. Please head back. (Demo: no message is sent to a parent yet.)`, 'danger');
   try { navigator.vibrate?.([250, 120, 250]); } catch {}
 }
@@ -529,8 +519,9 @@ async function startWalk() {
     steps: 0, sensorTotal: 0, coins: 0, eggsFound: 0, nextEggCheck: EGG_CHECK_EVERY,
     activeMs: 0, lastTick: performance.now(), paused: false, far: false,
     gpsKm: 0, gpsPoints: 0, kmCredited: 0, start: null, lastFix: null, gpsState: 'waiting',
-    fruitsAtStart: Math.floor(state.steps / PER_FRUIT), demoTimer: 0, tickTimer: 0, watchId: null,
+    demoTimer: 0, tickTimer: 0, watchId: null,
   };
+  sfx('walkstart');
   $('walk').hidden = false;
   document.body.classList.add('walking');
   $('walkAlert').hidden = true;
@@ -573,7 +564,7 @@ function endWalk() {
   if (walk.watchId != null) navigator.geolocation.clearWatch(walk.watchId);
   const w = walk;
   walk = null;
-  const fruits = Math.min(Math.floor(state.steps / PER_FRUIT), state.goal / PER_FRUIT) - Math.min(w.fruitsAtStart, state.goal / PER_FRUIT);
+  sfx('walkend');
   const km = w.steps * STRIDE_KM;
   state.walks.push({ at: Date.now(), steps: w.steps, km: +km.toFixed(2), coins: w.coins, eggs: w.eggsFound, mins: Math.floor(w.activeMs / 60000) });
   save();
@@ -587,7 +578,6 @@ function endWalk() {
         <div><span class="num">${Math.floor(secs / 60)}:${String(secs % 60).padStart(2, '0')}</span><span>time</span></div>
       </div>
       <ul class="sum-list">
-        <li><span class="mini">${fruitSVG(0)}</span>${fruits} new ${fruits === 1 ? 'fruit' : 'fruits'} on today's stick</li>
         <li><span class="mini">${coinSVG}</span>${fmt(w.coins)} coins earned</li>
         <li><span class="mini">${eggArt()}</span>${w.eggsFound} ${w.eggsFound === 1 ? 'egg' : 'eggs'} found</li>
       </ul>
@@ -637,6 +627,7 @@ $('sosBtn').addEventListener('pointerdown', (e) => { e.preventDefault(); sosStar
 $('sosBtn').addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); sendSOS(); } });
 $('sosBtn').addEventListener('contextmenu', (e) => e.preventDefault());
 function sendSOS() {
+  sfx('alert');
   try { navigator.vibrate?.(400); } catch {}
   const where = walk?.lastFix ? `${walk.lastFix.lat.toFixed(5)}, ${walk.lastFix.lon.toFixed(5)}` : 'location not available yet';
   state.alerts.push({ at: Date.now(), kind: 'sos', demo: true });

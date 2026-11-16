@@ -1,4 +1,5 @@
 // Ranks, your profile with friends (added in person by QR, cheers only) and the parent view.
+import { play as sfx, soundOn, setSound } from './sfx.js';
 import { avatarPicture } from './avatar3d.js';
 import { petPortrait } from './scene.js';
 import { PETS } from './pets.js';
@@ -44,6 +45,10 @@ export function initSocial(c) {
   });
   $('addFriend').addEventListener('click', openAddFriend);
   $('openParent').addEventListener('click', () => ctx.showScreen('parent'));
+  const snd = $('soundBtn');
+  const showSnd = () => { snd.textContent = soundOn() ? 'Sound: on' : 'Sound: off'; snd.setAttribute('aria-pressed', soundOn()); };
+  snd.addEventListener('click', () => { setSound(!soundOn()); showSnd(); });
+  showSnd();
   $('meBack').addEventListener('click', () => ctx.showScreen('home'));
   $('parentBack').addEventListener('click', () => ctx.showScreen('me'));
   $('safeSeg').addEventListener('click', (e) => {
@@ -154,6 +159,7 @@ function openFriend(f) {
     </div>`);
   avatarPicture(f.outfit, { size: 240 }).then((s) => { const i = body.querySelector('.fs-av'); if (i) i.src = s; });
   body.querySelectorAll('.cheers .chip').forEach((b) => b.addEventListener('click', () => {
+    sfx('cheer');
     closeSheet();
     toast(`Cheer sent to ${f.name}: "${b.textContent}"`);
   }));
@@ -229,7 +235,7 @@ export async function renderParent() {
     ${last ? `<br><span class="muted small">Last walk: ${new Date(last.at).toLocaleString('en-SG', { weekday: 'short', hour: 'numeric', minute: '2-digit' })}, ${last.km.toFixed(2)} km, ${fmt(last.steps)} steps</span>` : ''}</span>`;
   $('alertList').innerHTML = state.alerts.length
     ? [...state.alerts].reverse().map((a) => `
-      <li class="${a.kind === 'sos' ? 'sos' : 'far'}">
+      <li class="${a.kind === 'sos' ? 'al-sos' : 'al-far'}">
         <strong>${a.kind === 'sos' ? 'SOS pressed' : 'Left the safe zone'}</strong>
         <span class="muted small">${new Date(a.at).toLocaleString('en-SG', { day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit' })}${a.demo ? ' · demo' : ''}</span>
       </li>`).join('')

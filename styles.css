@@ -176,7 +176,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
 }
 
 /* Fruit stick: the signature */
-.skewer-card { border-radius: var(--r-lg); padding: 12px 16px 10px; }
+.steps-card { border-radius: var(--r-lg); padding: 12px 16px 10px; }
 .row { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
 h2 { margin: 0; font-size: 17px; font-weight: 800; line-height: 1.2; }
 .chip {
@@ -192,36 +192,31 @@ h2 { margin: 0; font-size: 17px; font-weight: 800; line-height: 1.2; }
 .steps { margin: 2px 0 0; display: flex; align-items: baseline; gap: 8px; }
 .steps .num { font-size: 48px; font-weight: 800; line-height: 1; letter-spacing: -.01em; }
 .steps .of { font-size: 16px; color: var(--ink-soft); }
-.skewer {
+/* Today's steps: one chunky bar, a coin mark at every 1,000 steps */
+.goal-bar {
   position: relative;
-  display: grid;
-  grid-template-columns: repeat(6, 1fr);
-  align-items: center;
-  margin: 8px 6px 2px 2px;
-  padding-right: 18px;
-  height: 58px;
+  height: 24px;
+  margin: 14px 12px 22px 2px;
+  border: var(--line) solid var(--ink);
+  border-radius: 99px;
+  background: #FFF1EA;
+  box-shadow: inset 0 3px 0 rgba(91, 44, 30, .08);
 }
-.skewer::before {
-  /* the stick */
-  content: "";
-  position: absolute;
-  left: -2px; right: 0; top: 50%;
-  height: 7px;
-  transform: translateY(-50%);
-  background: #E6B07C;
-  border: 2px solid var(--ink);
-  border-radius: 99px 2px 2px 99px;
+.goal-fill {
+  position: absolute; left: 0; top: 0; bottom: 0;
+  width: 0;
+  border-radius: 99px;
+  background: var(--berry);
+  box-shadow: inset 0 4px 0 rgba(255, 255, 255, .28);
+  transition: width .6s cubic-bezier(.2, .9, .25, 1);
 }
-.slot { position: relative; display: grid; place-items: center; }
-.slot svg { width: 100%; max-width: 54px; height: auto; display: block; }
-.slot.filled svg { filter: drop-shadow(0 3px 0 rgba(91, 44, 30, .15)); }
-.slot.partial { --fill: 40%; }
-.slot.partial .ghost { opacity: .35; }
-.slot.partial .meter {
-  position: absolute; left: 50%; bottom: -6px; transform: translateX(-50%);
-  width: 70%; height: 5px; border-radius: 99px; background: #F3D9CC; overflow: hidden;
-}
-.slot.partial .meter > i { display: block; height: 100%; width: var(--fill); background: var(--berry); }
+.goal-marks { list-style: none; margin: 0; padding: 0; position: absolute; inset: 0; }
+.goal-marks li { position: absolute; top: 50%; left: var(--x); transform: translate(-50%, -50%); display: grid; justify-items: center; }
+.goal-marks .mk { width: 26px; height: 26px; display: block; filter: grayscale(1); opacity: .45; transition: filter .3s, opacity .3s, transform .3s; }
+.goal-marks .mk svg { width: 100%; height: 100%; display: block; }
+.goal-marks li.hit .mk { filter: none; opacity: 1; transform: scale(1.08); }
+.goal-marks small { position: absolute; top: calc(100% + 1px); font-size: 11px; font-weight: 800; color: var(--ink-soft); }
+@media (prefers-reduced-motion: reduce) { .goal-fill, .goal-marks .mk { transition: none; } }
 .caption { margin: 8px 0 0; font-size: 15px; color: var(--ink-soft); }
 
 .pop { animation: pop .5s cubic-bezier(.3, 1.6, .5, 1) both; }
@@ -656,8 +651,8 @@ body.walking .dock { visibility: hidden; }
 .p-block > p { margin: 0; }
 .alert-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
 .alert-list li { display: grid; padding: 6px 10px 4px; border-radius: 12px; background: var(--card-soft); }
-.alert-list li.sos { background: #FFE1E5; }
-.alert-list li.far { background: #FFF6D6; }
+.alert-list li.al-sos { background: #FFE1E5; }
+.alert-list li.al-far { background: #FFF6D6; }
 .week-bars { list-style: none; margin: 4px 0 0; padding: 0; height: 130px; display: grid; grid-template-columns: repeat(7, 1fr); gap: 6px; align-items: end; }
 .week-bars li { height: 100%; display: grid; grid-template-rows: auto 1fr auto; justify-items: center; align-items: end; gap: 3px; }
 .wb { width: 100%; max-width: 30px; background: var(--mint); border: 2px solid var(--ink); border-radius: 8px 8px 4px 4px; min-height: 6px; }

@@ -13,8 +13,10 @@ export function loadGLB(file) {
   return cache.get(file);
 }
 
-export const DEFAULT_OUTFIT = { look: 'male-a', hat: null, eyes: null, chair: null, hearing: false };
+export const DEFAULT_OUTFIT = { look: 'male-a', hat: null, eyes: null, hold: null, chair: null, hearing: false };
 export const AVATAR_HEIGHT = 1.55;
+// Where a held thing sits in the right arm bone's space (the hand end of the arm), tuned by eye.
+const HOLD_FIT = { pos: [-0.25, 0, 0.03], rot: [0, -Math.PI / 2, 0], scale: 1.3 };
 
 const mat = (color, rough = 0.6) => new THREE.MeshStandardMaterial({ color, roughness: rough, metalness: 0 });
 const put = (parent, mesh, x, y, z, rx = 0, ry = 0, rz = 0) => {
@@ -79,12 +81,169 @@ const HATS = {
 };
 function cap(main, trim) {
   const g = new THREE.Group();
-  put(g, rbox(1.04, 0.3, 1.04, main, 0.12), 0, 0.12, 0);
-  put(g, rbox(0.92, 0.07, 0.5, main, 0.03), 0, 0.02, 0.64);
-  put(g, rbox(0.16, 0.06, 0.16, trim, 0.03), 0, 0.29, 0);
-  put(g, rbox(0.5, 0.18, 0.05, trim, 0.04), 0, 0.14, 0.52);
+  put(g, rbox(1.04, 0.26, 1.04, main, 0.12), 0, 0.1, 0);
+  put(g, rbox(0.86, 0.06, 0.32, main, 0.03), 0, 0.01, 0.6);
+  put(g, rbox(0.16, 0.06, 0.16, trim, 0.03), 0, 0.25, 0);
+  put(g, rbox(0.44, 0.15, 0.05, trim, 0.04), 0, 0.12, 0.52);
   return g;
 }
+// ---------- Things to hold (right hand) ----------
+// Drawn in "head units" like the hats: the grip is at the origin and the thing points up (+y), front is +z.
+const cyl = (r, h, color, seg = 10) => { const m = new THREE.Mesh(new THREE.CylinderGeometry(r, r, h, seg), mat(color)); m.castShadow = true; return m; };
+const ball = (r, color, seg = 16) => { const m = new THREE.Mesh(new THREE.SphereGeometry(r, seg, Math.round(seg * 0.75)), mat(color, 0.45)); m.castShadow = true; return m; };
+const ring = (r, t, color) => { const m = new THREE.Mesh(new THREE.TorusGeometry(r, t, 8, 24), mat(color, 0.4)); m.castShadow = true; return m; };
+const HOLDS = {
+  lollipop: () => {
+    const g = new THREE.Group();
+    put(g, cyl(0.035, 0.62, '#FFFFFF'), 0, 0.22, 0);
+    put(g, cyl(0.26, 0.09, '#FF7FB0', 24), 0, 0.72, 0, Math.PI / 2, 0, 0);
+    put(g, ring(0.17, 0.035, '#FFFFFF'), 0, 0.72, 0.05);
+    put(g, ring(0.08, 0.03, '#FFD44F'), 0, 0.72, 0.05);
+    return g;
+  },
+  balloon: () => {
+    const g = new THREE.Group();
+    put(g, cyl(0.012, 1.0, '#FFFFFF', 6), 0, 0.42, 0);
+    const b = ball(0.3, '#EF3E5C', 20); b.scale.set(1, 1.18, 1); put(g, b, 0, 1.22, 0);
+    put(g, rbox(0.08, 0.07, 0.08, '#C42A45', 0.02), 0, 0.88, 0);
+    put(g, ball(0.06, '#FFFFFF', 8), -0.1, 1.36, 0.25);
+    return g;
+  },
+  football: () => {
+    const g = new THREE.Group();
+    put(g, ball(0.24, '#FFFFFF', 18), 0, 0.12, 0.08);
+    [[0, 0.36, 0.08], [0.21, 0.16, 0.13], [-0.21, 0.16, 0.13], [0, 0.12, 0.32], [0.12, -0.04, 0.26], [-0.12, -0.04, 0.26]]
+      .forEach(([x, y, z]) => put(g, ball(0.075, '#2B2B33', 8), x * 0.92, y * 0.92 + 0.01, z * 0.92));
+    return g;
+  },
+  teddy: () => {
+    const g = new THREE.Group();
+    const fur = '#C98B5A', light = '#F1D2B0';
+    put(g, rbox(0.3, 0.32, 0.22, fur, 0.1), 0, 0.12, 0.06);
+    put(g, rbox(0.3, 0.26, 0.24, fur, 0.1), 0, 0.42, 0.06);
+    [-0.12, 0.12].forEach((x) => put(g, rbox(0.1, 0.1, 0.08, fur, 0.04), x, 0.58, 0.06));
+    put(g, rbox(0.14, 0.09, 0.06, light, 0.03), 0, 0.38, 0.19);
+    put(g, rbox(0.05, 0.035, 0.03, '#2B1710', 0.01), 0, 0.41, 0.225);
+    [-0.07, 0.07].forEach((x) => put(g, rbox(0.04, 0.04, 0.02, '#2B1710', 0.01), x, 0.47, 0.185));
+    put(g, rbox(0.16, 0.06, 0.24, '#D42A45', 0.02), 0, 0.29, 0.06);
+    return g;
+  },
+  pinwheel: () => {
+    const g = new THREE.Group();
+    put(g, cyl(0.03, 0.8, '#7FD8A6'), 0, 0.3, 0);
+    const head = new THREE.Group(); head.position.set(0, 0.74, 0.05); head.name = 'spin'; g.add(head);
+    ['#EF3E5C', '#FFD44F', '#5D7FE0', '#7FD8A6'].forEach((c, i) => {
+      const blade = new THREE.Group(); blade.rotation.z = (i / 4) * Math.PI * 2; head.add(blade);
+      put(blade, rbox(0.12, 0.26, 0.02, c, 0.01), 0.06, 0.14, 0, 0, 0, -0.35);
+    });
+    put(head, ball(0.045, '#FFFFFF', 8), 0, 0, 0.02);
+    return g;
+  },
+  bottle: () => {
+    const g = new THREE.Group();
+    put(g, rbox(0.2, 0.44, 0.2, '#8FD3F4', 0.07), 0, 0.12, 0.04);
+    put(g, rbox(0.21, 0.1, 0.21, '#FFFFFF', 0.03), 0, 0.06, 0.04);
+    put(g, rbox(0.13, 0.09, 0.13, '#3FA874', 0.03), 0, 0.38, 0.04);
+    return g;
+  },
+  racket: () => {
+    const g = new THREE.Group();
+    put(g, cyl(0.04, 0.34, '#3B3B48'), 0, 0.06, 0);
+    put(g, cyl(0.018, 0.22, '#C1C1D8'), 0, 0.33, 0);
+    const frame = ring(0.18, 0.025, '#D42A45'); frame.scale.set(1, 1.25, 1); put(g, frame, 0, 0.66, 0);
+    const net = new THREE.Mesh(new THREE.CircleGeometry(0.17, 20), new THREE.MeshStandardMaterial({ color: '#FFFFFF', transparent: true, opacity: 0.55, side: THREE.DoubleSide }));
+    net.scale.set(1, 1.25, 1); put(g, net, 0, 0.66, 0);
+    return g;
+  },
+  bubbles: () => {
+    const g = new THREE.Group();
+    put(g, cyl(0.03, 0.56, '#A98BEA'), 0, 0.2, 0);
+    put(g, ring(0.12, 0.03, '#A98BEA'), 0, 0.6, 0);
+    const soap = (r) => new THREE.Mesh(new THREE.SphereGeometry(r, 14, 10), new THREE.MeshStandardMaterial({ color: '#C6EBFB', transparent: true, opacity: 0.45, roughness: 0.1 }));
+    [[0.22, 0.9, 0.1, 0.1], [-0.12, 1.08, 0.05, 0.07], [0.08, 1.24, -0.04, 0.05]].forEach(([x, y, z, r]) => put(g, soap(r), x, y, z));
+    return g;
+  },
+};
+export function makeHold(id) {
+  const g = HOLDS[id]?.();
+  g?.traverse((o) => { if (o.isMesh) o.castShadow = true; });
+  return g || null;
+}
+
+// ---------- More avatars: recoloured versions of each look ----------
+// "male-a.2" = male-a with new clothes colours and another skin tone, made by repainting the shared colour texture.
+export const VARIANTS = { 2: { hue: 140, skin: '#EFBA94' }, 3: { hue: 230, skin: '#C99068' } };
+const hsv = (r, g, b) => {
+  const mx = Math.max(r, g, b), mn = Math.min(r, g, b), d = mx - mn;
+  let h = 0;
+  if (d) h = mx === r ? ((g - b) / d) % 6 : mx === g ? (b - r) / d + 2 : (r - g) / d + 4;
+  return [((h * 60) + 360) % 360, mx ? d / mx : 0, mx / 255];
+};
+const isSkin = ([h, s, v]) => h >= 8 && h <= 34 && s >= 0.22 && s <= 0.68 && v >= 0.4 && v <= 0.98;
+function hueRotate(r, g, b, deg) {
+  const [h, s, v] = hsv(r, g, b);
+  const nh = (h + deg) % 360, c = v * s, x = c * (1 - Math.abs(((nh / 60) % 2) - 1)), m = v - c;
+  const [r1, g1, b1] = nh < 60 ? [c, x, 0] : nh < 120 ? [x, c, 0] : nh < 180 ? [0, c, x] : nh < 240 ? [0, x, c] : nh < 300 ? [x, 0, c] : [c, 0, x];
+  return [(r1 + m) * 255, (g1 + m) * 255, (b1 + m) * 255].map(Math.round);
+}
+const variantTex = new Map();
+function recolour(model, look, spec) {
+  let map = null;
+  model.traverse((m) => { if (m.isMesh && m.material?.map) map ||= m.material.map; });
+  if (!map?.image) return;
+  let tex = variantTex.get(look);
+  if (!tex) {
+    const img = map.image, W = img.width, H = img.height;
+    const cv = document.createElement('canvas'); cv.width = W; cv.height = H;
+    const cx = cv.getContext('2d', { willReadFrequently: true });
+    cx.drawImage(img, 0, 0);
+    const data = cx.getImageData(0, 0, W, H), px = data.data;
+    // Which texture colours this character uses, and its skin colour (most common skin-like colour on the head).
+    const used = new Set(), headSkin = new Map();
+    model.traverse((m) => {
+      const uv = m.isMesh && m.geometry.attributes.uv;
+      if (!uv) return;
+      for (let i = 0; i < uv.count; i++) {
+        const x = Math.min(W - 1, Math.floor(uv.getX(i) * W));
+        const y = Math.min(H - 1, Math.floor((map.flipY ? 1 - uv.getY(i) : uv.getY(i)) * H));
+        const k = (y * W + x) * 4, key = (px[k] << 16) | (px[k + 1] << 8) | px[k + 2];
+        used.add(key);
+        if (m.name === 'head-mesh' && isSkin(hsv(px[k], px[k + 1], px[k + 2]))) headSkin.set(key, (headSkin.get(key) || 0) + 1);
+      }
+    });
+    // Of the two commonest skin-like colours on the head, the brighter one is the face (the darker may be hair).
+    const top2 = [...headSkin].sort((a, b) => b[1] - a[1]).slice(0, 2).map(([k]) => k);
+    const val = (k) => Math.max((k >> 16) & 255, (k >> 8) & 255, k & 255);
+    const base = top2.sort((a, b) => val(b) - val(a))[0];
+    const bc = base == null ? null : [(base >> 16) & 255, (base >> 8) & 255, base & 255];
+    const bh = bc && hsv(...bc);
+    // Skin = close to the face colour in hue and brightness (so hair and beards keep their own colour).
+    const nearFace = (h) => bh && isSkin(h) && Math.abs(h[0] - bh[0]) <= 12 && Math.abs(h[2] - bh[2]) <= 0.25;
+    const hairBrown = (h) => h[0] >= 5 && h[0] <= 40 && h[2] < 0.62;
+    const tc = new THREE.Color(spec.skin);
+    const target = [tc.r * 255, tc.g * 255, tc.b * 255];
+    const memo = new Map();
+    for (let k = 0; k < px.length; k += 4) {
+      const key = (px[k] << 16) | (px[k + 1] << 8) | px[k + 2];
+      let out = memo.get(key);
+      if (!out) {
+        const c = [px[k], px[k + 1], px[k + 2]], h = hsv(...c);
+        if (nearFace(h)) out = c.map((v, i) => Math.max(0, Math.min(255, Math.round(v * target[i] / Math.max(bc[i], 1)))));
+        else if (h[1] > 0.25 && !hairBrown(h) && !isSkin(h)) out = hueRotate(...c, spec.hue);
+        else out = c;
+        memo.set(key, out);
+      }
+      px[k] = out[0]; px[k + 1] = out[1]; px[k + 2] = out[2];
+    }
+    cx.putImageData(data, 0, 0);
+    tex = new THREE.CanvasTexture(cv);
+    ['flipY', 'colorSpace', 'magFilter', 'minFilter', 'wrapS', 'wrapT', 'generateMipmaps', 'anisotropy'].forEach((p) => { tex[p] = map[p]; });
+    tex.needsUpdate = true;
+    variantTex.set(look, tex);
+  }
+  model.traverse((m) => { if (m.isMesh && m.material?.map) { m.material = m.material.clone(); m.material.map = tex; } });
+}
+
 export function makeHat(id) {
   const g = HATS[id]?.();
   g?.traverse((o) => { if (o.isMesh) o.castShadow = true; });
@@ -104,21 +263,26 @@ function measureHead(model, head) {
   } else box.setFromObject(model);
   const toLocal = (v) => head.worldToLocal(v.clone());
   const c = box.getCenter(new THREE.Vector3());
+  // Lengths are measured in the head bone's own units (the bone is scaled, so model-space sizes come out wrong).
+  const len = (a, b) => toLocal(a).distanceTo(toLocal(b));
+  const at = (x, y, z) => new THREE.Vector3(x, y, z);
   return {
-    top: toLocal(new THREE.Vector3(c.x, box.max.y, c.z)),
+    top: toLocal(at(c.x, box.max.y, c.z)),
     center: toLocal(c),
-    front: box.max.z - c.z,
-    width: box.max.x - box.min.x,
-    height: box.max.y - box.min.y,
-    side: box.max.x - c.x,
+    front: len(c, at(c.x, c.y, box.max.z)),
+    width: len(at(box.min.x, c.y, c.z), at(box.max.x, c.y, c.z)),
+    height: len(at(c.x, box.min.y, c.z), at(c.x, box.max.y, c.z)),
+    side: len(c, at(box.max.x, c.y, c.z)),
   };
 }
 
 // Builds { root, model, animations, sitting }. root stands on y = 0 and is AVATAR_HEIGHT tall.
 export async function buildAvatar(outfit = DEFAULT_OUTFIT) {
   const o = { ...DEFAULT_OUTFIT, ...outfit };
-  const gltf = await loadGLB(`character-${o.look}.glb`);
+  const [baseLook, variant] = String(o.look).split('.');
+  const gltf = await loadGLB(`character-${baseLook}.glb`);
   const model = cloneSkinned(gltf.scene);
+  if (VARIANTS[variant]) recolour(model, o.look, VARIANTS[variant]);
   model.traverse((m) => { if (m.isMesh) { m.castShadow = true; m.receiveShadow = true; } });
   const root = new THREE.Group();
   root.add(model);
@@ -134,8 +298,8 @@ export async function buildAvatar(outfit = DEFAULT_OUTFIT) {
     if (o.hat) {
       const hat = makeHat(o.hat);
       if (hat) {
-        hat.scale.setScalar(hm.width * 1.1);
-        hat.position.copy(hm.top).add(new THREE.Vector3(0, -hm.height * 0.3, 0));
+        hat.scale.setScalar(hm.width * 1.0);
+        hat.position.copy(hm.top).add(new THREE.Vector3(0, -hm.height * 0.12, 0));
         hat.name = 'hat';
         head.add(hat);
       }
@@ -151,6 +315,19 @@ export async function buildAvatar(outfit = DEFAULT_OUTFIT) {
       head.add(g);
     }
   }
+  if (o.hold) {
+    let arm = null;
+    model.traverse((m) => { if (m.name === 'arm-right' && !m.isMesh) arm = m; });
+    const thing = makeHold(o.hold);
+    if (arm && thing) {
+      const unit = head ? measureHead(model, head).width : 0.45;
+      thing.scale.setScalar(unit * HOLD_FIT.scale);
+      thing.position.set(...HOLD_FIT.pos);
+      thing.rotation.set(...HOLD_FIT.rot);
+      thing.name = 'hold';
+      arm.add(thing);
+    }
+  }
   let sitting = false;
   if (o.chair) {
     const chair = (await loadGLB(`${o.chair}.glb`)).scene.clone();
@@ -160,7 +337,7 @@ export async function buildAvatar(outfit = DEFAULT_OUTFIT) {
     sitting = true;
   }
   root.scale.setScalar(scale);
-  return { root, model, animations: gltf.animations, sitting };
+  return { root, model, animations: gltf.animations, sitting, holding: !!o.hold };
 }
 
 // One shared offscreen renderer for still pictures (shop cards, ranks, friends).
@@ -172,7 +349,7 @@ function lightUp(scene) {
   sun.position.set(3, 6, 4);
   scene.add(sun);
 }
-export function snapshot(object, { size = 192, yaw = 0.5, pad = 2.1, lift = 0.45, focus = null } = {}) {
+export function snapshot(object, { size = 192, yaw = 0.5, pad = 2.1, lift = 0.45, focus = null, box = null } = {}) {
   try {
     if (!shotRenderer) {
       shotRenderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, preserveDrawingBuffer: true });
@@ -188,7 +365,8 @@ export function snapshot(object, { size = 192, yaw = 0.5, pad = 2.1, lift = 0.45
     s.add(holder);
     s.updateMatrixWorld(true);
     const b = new THREE.Box3();
-    (Array.isArray(focus) ? focus : [focus || holder]).forEach((f) => b.union(new THREE.Box3().setFromObject(f)));
+    if (box) b.copy(box);
+    else (Array.isArray(focus) ? focus : [focus || holder]).forEach((f) => b.union(new THREE.Box3().setFromObject(f)));
     const c = b.getCenter(new THREE.Vector3());
     const span = Math.max(b.max.x - b.min.x, b.max.y - b.min.y, b.max.z - b.min.z);
     const cam = new THREE.PerspectiveCamera(30, 1, 0.01, 100);
@@ -206,7 +384,7 @@ export async function avatarPicture(outfit, { size = 192, head = false } = {}) {
   const p = (async () => {
     const av = await buildAvatar(outfit);
     const mixer = new THREE.AnimationMixer(av.model);
-    const clip = av.animations.find((a) => a.name === (av.sitting ? 'wheelchair-sit' : 'idle'));
+    const clip = av.animations.find((a) => a.name === (av.sitting ? 'wheelchair-sit' : av.holding ? 'holding-right' : 'idle'));
     if (clip) { mixer.clipAction(clip).play(); mixer.update(0.4); }
     let focus = null;
     if (head) {
@@ -214,7 +392,9 @@ export async function avatarPicture(outfit, { size = 192, head = false } = {}) {
       focus = [];
       av.model.traverse((m) => { if (m.name === 'head-mesh' || m.name === 'hat') focus.push(m); });
     }
-    return snapshot(av.root, head ? { size, yaw: 0.25, pad: 1.9, lift: 0.1, focus } : { size, yaw: 0.45, pad: 1.75, lift: 0.25 });
+    const top = AVATAR_HEIGHT + (outfit.hat ? 0.4 : 0.2) + (outfit.hold === 'balloon' ? 0.75 : outfit.hold ? 0.3 : 0);
+    const box = new THREE.Box3(new THREE.Vector3(-0.7, 0, -0.5), new THREE.Vector3(0.7, top, 0.5));
+    return snapshot(av.root, head ? { size, yaw: 0.25, pad: 1.9, lift: 0.1, focus } : { size, yaw: 0.45, pad: 1.9, lift: 0.18, box });
   })();
   shotCache.set(key, p);
   return p;
@@ -226,6 +406,7 @@ export async function itemPicture(kind, id, size = 160) {
   const p = (async () => {
     let obj;
     if (kind === 'hat') obj = makeHat(id);
+    else if (kind === 'hold') obj = makeHold(id);
     else if (kind === 'eyes') obj = (await loadGLB(`aid-${id}.glb`)).scene.clone();
     else obj = (await loadGLB(id === 'hearing' ? 'aid_hearing.glb' : `${id}.glb`)).scene.clone();
     return snapshot(obj, { size, yaw: kind === 'hat' ? 0.5 : 0.6, pad: 1.9, lift: 0.5 });

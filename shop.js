@@ -1,8 +1,9 @@
-// Shop: dress your avatar with coins earned by walking. Looks and aids are always free.
+// Shop: dress your avatar with coins earned by walking. Looks are always free.
 import { createStage } from './scene.js';
 import { avatarPicture, itemPicture } from './avatar3d.js';
 import { LOOKS, SHOP, SHOP_TABS } from './data.js';
 import { coinSVG } from './art.js';
+import { play as sfx } from './sfx.js';
 
 let ctx, stage = null, tab = 'looks', tried = null; // tried = { kind, id }
 
@@ -51,7 +52,6 @@ function renderGrid() {
   grid.innerHTML = '';
   const def = SHOP_TABS.find((t) => t.id === tab);
   const list = tab === 'looks' ? LOOKS.map((id) => ({ kind: 'look', id, name: '', price: 0 })) : SHOP.filter((s) => def.kinds.includes(s.kind));
-  if (tab === 'aids') grid.insertAdjacentHTML('beforeend', '<p class="shop-note">Always free. Everyone can play, however they get around.</p>');
   list.forEach((item, i) => {
     const wearing = isWearing(state.outfit, item.kind, item.id);
     const sel = tried && tried.kind === item.kind && tried.id === item.id;
@@ -65,7 +65,7 @@ function renderGrid() {
     b.innerHTML = `<span class="ph"><img alt=""></span>${item.name ? `<span class="nm">${esc(item.name)}</span>` : ''}${tag}`;
     b.setAttribute('aria-label', `${item.name || `Look ${i + 1}`}${wearing ? ', wearing' : ''}`);
     const img = b.querySelector('img');
-    (item.kind === 'look' ? avatarPicture({ look: item.id }, { size: 192 }) : itemPicture(item.kind === 'chair' || item.kind === 'hearing' ? 'aid' : item.kind, item.id, 160))
+    (item.kind === 'look' ? avatarPicture({ look: item.id }, { size: 192 }) : itemPicture(item.kind, item.id, 160))
       .then((src) => { img.src = src; });
     b.addEventListener('click', () => {
       tried = sel ? null : { kind: item.kind, id: item.id };
@@ -95,10 +95,10 @@ function renderBar() {
   if (wearing) {
     $('tryNote').textContent = 'You are wearing this';
     if (tried.kind === 'look') { btn.hidden = true; return; }
-    btn.textContent = tried.kind === 'chair' ? 'Leave chair' : 'Take off';
+    btn.textContent = tried.kind === 'hold' ? 'Put down' : 'Take off';
     btn.className = 'btn-soft';
   } else if (owns(item)) {
-    $('tryNote').textContent = item.care ? 'Always free' : item.price === 0 ? 'Free' : 'You own this';
+    $('tryNote').textContent = item.price === 0 ? 'Free' : 'You own this';
     btn.textContent = 'Wear';
   } else if (state.coins >= item.price) {
     $('tryNote').textContent = `${fmt(item.price)} coins`;
@@ -132,6 +132,7 @@ function onAction() {
       state.coins -= item.price;
       state.owned.push(item.id);
       ctx.renderTop();
+      sfx('buy');
       toast(`Bought ${item.name}! -${fmt(item.price)} coins`);
     } else toast(tried.kind === 'look' ? 'New look on!' : `Wearing ${item.name}`);
     if (tried.kind === 'hearing') o.hearing = true; else o[slotOf(tried.kind)] = tried.id;
