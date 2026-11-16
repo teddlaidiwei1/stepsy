@@ -48,6 +48,7 @@ export function initSocial(c) {
   });
   $('addFriend').addEventListener('click', openAddFriend);
   takeLinkCode();
+  takeCoros();
   startOnline();
   if (ctx.state.demo) linkAdd();
   $('openParent').addEventListener('click', () => ctx.gate(() => ctx.showScreen('parent')));
@@ -80,6 +81,42 @@ const mySteps = () => {
 const avg = (rows) => Math.round(rows.reduce((s, r) => s + r.steps, 0) / rows.length);
 const medal = (i) => (i < 3 ? ` m${i + 1}` : '');
 
+// Friends board: you and your friends, by steps today (friends' steps update live).
+function friendsNow() {
+  const { state } = ctx;
+  return state.demo ? state.friends.map((id) => [...FRIENDS, NEW_FRIEND].find((f) => f.id === id)).filter(Boolean)
+    : online.friendList();
+}
+function renderFriendBoard() {
+  const { $, fmt, esc, state } = ctx;
+  const friends = friendsNow();
+  const rows = [{ you: true, name: state.nickname, steps: Math.round(state.steps || 0) },
+    ...friends.map((f) => ({ f, name: f.name, steps: Math.round(f.today || 0) }))]
+    .sort((a, b) => b.steps - a.steps || (a.you ? -1 : b.you ? 1 : a.name.localeCompare(b.name)));
+  const n = rows.findIndex((r) => r.you) + 1;
+  $('rankHero').innerHTML = friends.length
+    ? `<span class="rank-big num">#${n}</span><span class="rank-what"><strong>You are</strong> ${n === 1 ? 'top' : `number ${n}`} of your friends today</span>`
+    : '<span class="rank-big num">#1</span><span class="rank-what">Add friends on <strong>Me</strong> to race them here</span>';
+  $('rankUnit').textContent = 'Steps today';
+  $('rankNote').textContent = state.demo ? 'Demo names' : '';
+  const list = $('rankList');
+  list.innerHTML = rows.map((r, i) => `
+    <li class="rank-row${r.you ? ' you' : ''}${medal(i)}">
+      <span class="rk num">${i + 1}</span>
+      <span class="rav"><img alt=""></span>
+      <span class="rn">${r.you ? `${esc(r.name)} (you)` : esc(r.name)}</span>
+      <span class="rs num">${fmt(r.steps)}</span>
+      <button class="rank-hit" type="button" aria-label="${r.you ? 'Your profile' : `See ${esc(r.name)}'s profile`}"></button>
+    </li>`).join('');
+  list.querySelectorAll('.rank-row').forEach((li, i) => {
+    const r = rows[i];
+    const img = li.querySelector('img');
+    if (r.you) { const b = document.querySelector('#badge img'); if (b) img.src = b.src; else avatarPicture(state.outfit, { size: 96, head: true }).then((s) => { img.src = s; }); }
+    else avatarPicture(r.f.outfit, { size: 96, head: true }).then((s) => { img.src = s; });
+    li.querySelector('.rank-hit').addEventListener('click', () => (r.you ? ctx.showScreen('me') : showProfile({ ...r.f, friend: true })));
+  });
+}
+
 export function renderRanks() {
   const { $, fmt, esc } = ctx;
   $('rankTabs').querySelectorAll('[data-b]').forEach((b) => {
@@ -87,6 +124,9 @@ export function renderRanks() {
     b.classList.toggle('on', on);
     b.setAttribute('aria-selected', on);
   });
+  document.querySelector('#screen-ranks .award').hidden = board === 'friends';
+  if (board === 'friends') { renderFriendBoard(); return; }
+  $('rankNote').textContent = 'Demo names';
   const cls = classBoard(mySteps());
   const school = schoolBoard(avg(cls));
   const sg = sgBoard(avg(school));
@@ -271,13 +311,54 @@ const onMyPage = () => document.body.dataset.view === 'me' && !current;
 function startOnline() {
   const { state } = ctx;
   if (state.demo || !online.onlineAvailable()) return;
-  online.onChange(() => { if (onMyPage()) renderMe(); });
+  online.onChange(() => {
+    if (onMyPage()) renderMe();
+    if (document.body.dataset.view === 'ranks' && board === 'friends') renderRanks();
+  });
   online.onNewCheer((c) => { sfx('cheer'); notify(`${c.from} cheered you!`, `"${c.text}"`, { toast: ctx.toast, tag: 'cheer' }); });
   online.onNewRequest((r) => { sfx('cheer'); notify(`${r.from} wants to be your friend`, 'Open Me to say yes or no.', { toast: ctx.toast, tag: 'request' }); });
   const go = () => { if (state.onboarded) online.start(state).catch(() => {}); };
   go();
   document.addEventListener('stepsy-saved', () => { go(); online.pushProfile(state); linkAdd(); });
   linkAdd();
+  corosImport();
+}
+
+// ---------------- Tedd's own COROS watch steps (one-time link …/stepsy/?coros=2026-11-16.18659_…) ----------------
+// Only the phone whose friend code is Tedd's takes it; on anyone else's phone the link does nothing.
+const COROS_CODE = 'GT5-9UD';
+function takeCoros() {
+  const p = new URLSearchParams(location.search);
+  if (!p.has('coros')) return;
+  const raw = String(p.get('coros'));
+  p.delete('coros');
+  history.replaceState(null, '', `${location.pathname}${p.size ? `?${p}` : ''}${location.hash}`);
+  try { localStorage.setItem('stepsy-coros', raw.slice(0, 400)); } catch {}
+}
+async function corosImport() {
+  const { state } = ctx;
+  let raw = null;
+  try { raw = localStorage.getItem('stepsy-coros'); } catch {}
+  if (!raw || !state.onboarded || state.demo) return;
+  try { await online.start(state); } catch { return; }
+  try { localStorage.removeItem('stepsy-coros'); } catch {}
+  if (online.myCode() !== COROS_CODE) return;
+  const days = {};
+  for (const part of raw.split('_')) {
+    const m = /^(\d{4}-\d{2}-\d{2})\.(\d{1,6})$/.exec(part);
+    if (m) days[m[1]] = Math.min(+m[2], 99999);
+  }
+  let added = 0;
+  const log = { ...state.dayLog };
+  for (const [d, n] of Object.entries(days)) {
+    if (d < state.day && n > (log[d] || 0)) { added += n - (log[d] || 0); log[d] = n; }
+  }
+  state.dayLog = log;
+  const now = days[state.day];
+  if (now > state.steps) { added += now - state.steps; ctx.addSteps(now - state.steps); }
+  ctx.save();
+  if (document.body.dataset.view === 'ranks') renderRanks();
+  ctx.toast(added ? `Added ${ctx.fmt(added)} steps from your COROS watch` : 'Your COROS steps are already in');
 }
 
 // ---------------- Add-friend link (…/stepsy/?add=ABC-123) ----------------
