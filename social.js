@@ -124,7 +124,7 @@ export function renderMe() {
   $('meStats').innerHTML = `
     <div><span class="num">${fmt(state.steps)}</span><span>steps today</span></div>
     <div><span class="num">${new Set(state.pets.map((p) => p.type)).size}</span><span>${new Set(state.pets.map((p) => p.type)).size === 1 ? 'pet' : 'pets'}</span></div>
-    <div><span class="num">Lv ${state.level}</span><span>level</span></div>`;
+    <div><span class="num">${state.level}</span><span>level</span></div>`;
   const myBadges = earnedBadges();
   $('meBadges').innerHTML = myBadges.length ? myBadges.map((b) => `<li>${badgeArt(b)}<span>${esc(b.name)}</span></li>`).join('')
     : '<li class="empty">No badges yet. Finish your first walk to get one!</li>';

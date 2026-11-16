@@ -7,3 +7,4 @@ DESIGN.md
 *.log
 Thumbs.db
 desktop.ini
+tests/bugfinder-out/

@@ -199,7 +199,7 @@ h2 { margin: 0; font-size: 17px; font-weight: 800; line-height: 1.2; }
   padding: 2px 10px 0;
   font-size: 13px;
   font-weight: 800;
-  min-height: 32px;
+  min-height: 40px;
 }
 .chip:active { transform: translateY(1px); }
 .steps { margin: 2px 0 0; display: flex; align-items: baseline; gap: 8px; }
@@ -228,7 +228,7 @@ h2 { margin: 0; font-size: 17px; font-weight: 800; line-height: 1.2; }
 .goal-marks .mk { width: 26px; height: 26px; display: block; filter: grayscale(1); opacity: .45; transition: filter .3s, opacity .3s, transform .3s; }
 .goal-marks .mk svg { width: 100%; height: 100%; display: block; }
 .goal-marks li.hit .mk { filter: none; opacity: 1; transform: scale(1.08); }
-.goal-marks small { position: absolute; top: calc(100% + 1px); font-size: 11px; font-weight: 800; color: var(--ink-soft); }
+.goal-marks small { position: absolute; top: calc(100% + 1px); font-size: 12px; font-weight: 800; color: var(--ink-soft); }
 @media (prefers-reduced-motion: reduce) { .goal-fill, .goal-marks .mk { transition: none; } }
 .caption { margin: 8px 0 0; font-size: 15px; color: var(--ink-soft); }
 
@@ -349,7 +349,7 @@ h2 { margin: 0; font-size: 17px; font-weight: 800; line-height: 1.2; }
 .btn-soft { background: var(--card); color: var(--ink); }
 .btn-main:active, .btn-soft:active { transform: translateY(2px); border-bottom-width: 3px; }
 .btn-soft:disabled { opacity: .6; cursor: default; transform: none; border-bottom-width: 5px; }
-.btn-main.sm { min-height: 36px; font-size: 15px; padding: 2px 14px 0; border-bottom-width: 4px; }
+.btn-main.sm { min-height: 42px; font-size: 15px; padding: 2px 14px 0; border-bottom-width: 4px; }
 
 /* ---------- Pets tab ---------- */
 .viewer { border-radius: var(--r-lg); overflow: hidden; }
@@ -374,7 +374,7 @@ h2 { margin: 0; font-size: 17px; font-weight: 800; line-height: 1.2; }
 .pet-card.sel { background: #FFF1E8; box-shadow: inset 0 0 0 3px #fff, 0 0 0 3px var(--berry), var(--shadow); }
 .pc-name { font-weight: 800; font-size: 15px; line-height: 1.1; }
 .pc-sub { font-size: 12px; color: var(--ink-soft); }
-.pc-buddy { position: absolute; top: 6px; left: 6px; font-size: 11px; font-weight: 800; background: var(--lemon); border: 2px solid var(--ink); border-radius: 8px; padding: 0 6px; line-height: 1.6; }
+.pc-buddy { position: absolute; top: 6px; left: 6px; font-size: 12px; font-weight: 800; background: var(--lemon); border: 2px solid var(--ink); border-radius: 8px; padding: 0 6px; line-height: 1.6; }
 
 .egg-card.ready { background: #FFF6D6; }
 
@@ -594,7 +594,7 @@ body.walking .dock { visibility: hidden; }
 .rav img:not([src]) { visibility: hidden; }
 .mono { font-weight: 800; font-size: 14px; }
 .rn { font-weight: 700; font-size: 15px; line-height: 1.15; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
-.rn em { font-style: normal; font-size: 11px; font-weight: 800; background: var(--berry); color: #fff; border-radius: 7px; padding: 0 5px; margin-left: 2px; }
+.rn em { font-style: normal; font-size: 12px; font-weight: 800; background: var(--berry); color: #fff; border-radius: 7px; padding: 0 5px; margin-left: 2px; }
 .rs { font-weight: 800; font-size: 15px; }
 .rank-row.you { background: #FFE1D4; box-shadow: inset 0 0 0 2px var(--berry); }
 
@@ -611,7 +611,7 @@ body.walking .dock { visibility: hidden; }
 .me-stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; margin-top: 6px; text-align: center; }
 .me-stats div { display: grid; background: var(--card-soft); border-radius: 12px; padding: 4px 2px 2px; line-height: 1.1; }
 .me-stats .num { font-size: 17px; font-weight: 800; }
-.me-stats span:last-child { font-size: 11px; color: var(--ink-soft); }
+.me-stats span:last-child { font-size: 12px; color: var(--ink-soft); }
 .cheer-list { list-style: none; margin: 0; padding: 6px 14px; border-radius: var(--r-md); }
 .cheer-list li { padding: 7px 0 5px; font-size: 15px; }
 .cheer-list li + li { border-top: 2px dashed #EBCFC2; }
@@ -670,7 +670,7 @@ body.walking .dock { visibility: hidden; }
 .week-bars li { height: 100%; display: grid; grid-template-rows: auto 1fr auto; justify-items: center; align-items: end; gap: 3px; }
 .wb { width: 100%; max-width: 30px; background: var(--mint); border: 2px solid var(--ink); border-radius: 8px 8px 4px 4px; min-height: 6px; }
 .week-bars li:last-child .wb { background: var(--berry); }
-.wb-v { font-size: 11px; font-weight: 800; color: var(--ink-soft); }
+.wb-v { font-size: 12px; font-weight: 800; color: var(--ink-soft); }
 .wb-d { font-size: 12px; font-weight: 800; color: var(--ink-soft); }
 /* Start walk lives on Home only, so it never covers cards on the other tabs. */
 body:not([data-view="home"]) .walk-btn:not(.end) { display: none; }
@@ -730,3 +730,8 @@ body:not(.demo) .demo-only { display: none !important; }
 .gate input { font: inherit; font-size: 26px; font-weight: 800; text-align: center; color: var(--ink); width: 120px; justify-self: center; border: var(--line) solid var(--ink); border-radius: 14px; padding: 6px; background: var(--card-soft); }
 /* Pop-ups take focus when they open; no ring on the box itself. */
 .sheet:focus, .intro-card:focus { outline: none; }
+/* Bug finder (17 Nov): kids' fingers need about 40px to tap. The streak pill stays small in the top bar
+   but gets an invisible bigger tap area. */
+.streak { position: relative; }
+.streak::after { content: ''; position: absolute; inset: -6px 0; }
+.streak.zero { background: var(--card-soft); color: var(--ink); }

@@ -150,7 +150,8 @@ function renderTop() {
   $('nickname').textContent = state.nickname;
   $('levelText').textContent = `Lv ${state.level}`;
   $('levelBar').style.width = `${Math.min(100, Math.round((state.xp / needXp(state.level)) * 100))}%`;
-  $('streak').textContent = `${state.streak}-day streak`;
+  $('streak').textContent = state.streak > 0 ? `${state.streak}-day streak` : 'No streak yet';
+  $('streak').classList.toggle('zero', !state.streak);
   $('streak').setAttribute('aria-label', `${state.streak > 0 ? `${state.streak}-day streak` : 'No streak yet'}. See your week`);
   $('coins').textContent = fmt(state.coins);
 }
@@ -671,7 +672,8 @@ function endWalk() {
   const secs = Math.floor(w.activeMs / 1000);
   const body = openSheet(`
     <div class="summary">
-      <h2 id="sheetTitle">Nice walk!</h2>
+      <h2 id="sheetTitle">${w.steps ? 'Nice walk!' : 'No steps this time'}</h2>
+      ${w.steps ? '' : '<p class="muted">Walk with the screen open and your steps will count.</p>'}
       <div class="sum-grid">
         <div><span class="num">${fmt(w.steps)}</span><span>steps</span></div>
         <div><span class="num">${km.toFixed(2)}</span><span>km</span></div>
