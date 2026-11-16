@@ -8,3 +8,4 @@ DESIGN.md
 Thumbs.db
 desktop.ini
 tests/bugfinder-out/
+__pycache__/
