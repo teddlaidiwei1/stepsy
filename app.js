@@ -7,6 +7,7 @@ import { DEFAULT_OUTFIT, avatarPicture } from './avatar3d.js';
 import { initShop, showShop } from './shop.js';
 import { initQuests, renderQuests, claimable, checkBadges } from './quests.js';
 import { initSocial, renderRanks, renderMe, renderParent } from './social.js';
+import { initNotify, notify, askMotion, askLocation, askAlerts, alertsState } from './notify.js';
 
 const $ = (id) => document.getElementById(id);
 const fmt = (n) => Math.round(n).toLocaleString('en-SG');
@@ -29,7 +30,7 @@ const DEFAULTS = () => ({
   version: VERSION, nickname: 'Wei Jie', level: 6, xp: 210, coins: 1240, streak: 6, walkDays: seedDays(),
   day: todayKey(), steps: 3420, goal: 6000,
   eggs: [{ id: 'e1', rarity: 'rare', km: 1.2 }],
-  pets: [{ id: 'p1', type: 'otter' }],
+  pets: [...['otter', 'otter', 'otter', 'otter', 'otter', 'kingfisher', 'kingfisher', 'monitor'].map((type, i) => ({ id: `p${i + 1}`, type }))],
   buddy: 'otter', walks: [],
   // step 3
   outfit: { ...DEFAULT_OUTFIT }, owned: [], claimed: {}, badges: ['first', 'egg', 'week'],
@@ -140,8 +141,10 @@ function addProgress(steps, km) {
   const newFruits = Math.max(0, Math.min(after, maxFruits) - Math.min(before, maxFruits));
   const coins = newFruits * FRUIT_COINS;
   state.coins += coins;
-  for (const egg of state.eggs) egg.km = Math.min(egg.km + km, eggGoal(egg));
+  let readyNow = false;
+  for (const egg of state.eggs) { const was = eggReady(egg); egg.km = Math.min(egg.km + km, eggGoal(egg)); if (!was && eggReady(egg)) readyNow = true; }
   save();
+  if (readyNow) setTimeout(() => notify('Your egg is ready!', 'Open Pets and tap Hatch to see who it is.', { toast, tag: 'egg' }), 1200);
   return coins;
 }
 
@@ -216,7 +219,7 @@ function wobble(el) {
 
 function renderBuddy() {
   const p = PETS[state.buddy];
-  $('buddyName').textContent = p.name;
+  $('buddyName').textContent = `${isGold(state.buddy) ? 'Gold ' : ''}${p.name}`;
   $('buddySpecies').textContent = p.species.split(' ').slice(-1)[0].replace(/^\w/, (c) => c.toUpperCase());
 }
 
@@ -262,10 +265,11 @@ $('scrim').addEventListener('click', () => { if (!$('scrim').dataset.lock) close
 document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && !$('sheet').hidden && !$('scrim').dataset.lock) closeSheet(); });
 
 // ---------------- Hatching ----------------
+function isGold(type) { return state.pets.some((p) => p.type === type && p.gold); }
 function hatch(eggId) {
   const egg = state.eggs.find((e) => e.id === eggId);
   if (!egg || !eggReady(egg)) return;
-  const type = rollPet(egg.rarity);
+  const type = rollPet(egg.rarity, Math.random, state.pets.map((p) => p.type));
   const pet = PETS[type];
   const isNew = !state.pets.some((p) => p.type === type);
   state.eggs = state.eggs.filter((e) => e.id !== eggId);
@@ -282,12 +286,13 @@ function hatch(eggId) {
     </div>`, { lock: true });
   if (!reduceMotion) sfx('shake');
   const reveal = () => {
+    const gold = isGold(type);
     sfx('hatch');
     body.innerHTML = `
       <div class="hatch revealed">
         <div class="burst" aria-hidden="true"></div>
-        <img class="hatch-pet" src="${petPortrait(type, 320)}" alt="${esc(pet.name)} the ${esc(pet.species)}">
-        <h2 id="sheetTitle">It's ${esc(pet.name)}!</h2>
+        <img class="hatch-pet" src="${petPortrait(type, 320, { gold })}" alt="${gold ? 'Gold ' : ''}${esc(pet.name)} the ${esc(pet.species)}">
+        <h2 id="sheetTitle">It's ${gold ? 'Gold ' : ''}${esc(pet.name)}!</h2>
         <p class="rarity r-${egg.rarity}">${RARITY[egg.rarity].label}${isNew ? ' · New!' : ''}</p>
         <p class="species">${esc(pet.species)}</p>
         <p class="fact">${esc(pet.fact)}</p>
@@ -303,7 +308,7 @@ function hatch(eggId) {
     body.querySelector('[data-act="close"]').focus();
     // Show the new pet straight away on the Pets screen (it used to keep showing the old one).
     selected = type;
-    petStage?.setPet(type);
+    petStage?.setPet(type, { gold: isGold(type) });
     renderAll();
     if (!$('screen-pets').hidden) renderPets();
   };
@@ -313,9 +318,9 @@ function hatch(eggId) {
 function setBuddy(type) {
   state.buddy = type;
   selected = type;
-  petStage?.setPet(type);
+  petStage?.setPet(type, { gold: isGold(type) });
   save();
-  homeStage?.setPet(type);
+  homeStage?.setPet(type, { gold: isGold(type) });
   renderBuddy();
   renderPets();
   toast(`${PETS[type].name} is your buddy now`);
@@ -324,12 +329,68 @@ function setBuddy(type) {
 // ---------------- Pets tab ----------------
 let petStage = null;
 let selected = state.buddy;
+const petActions = document.createElement('div');
+petActions.className = 'pet-actions';
+$('buddyBtn').before(petActions);
+petActions.appendChild($('buddyBtn'));
+const goldBtn = document.createElement('button');
+goldBtn.id = 'goldBtn'; goldBtn.type = 'button'; goldBtn.className = 'btn-soft make-gold';
+goldBtn.textContent = 'Make gold'; goldBtn.hidden = true;
+petActions.appendChild(goldBtn);
+goldBtn.addEventListener('click', () => {
+  const type = selected, pet = PETS[type];
+  const body = openSheet(`
+    <div class="hatch gold-ask">
+      <img class="hatch-pet" src="${petPortrait(type, 240, { gold: true })}" alt="Gold ${esc(pet.name)}">
+      <h2 id="sheetTitle">Make a gold ${esc(pet.name)}?</h2>
+      <p class="fact">Your 5 ${esc(pet.name.endsWith('y') ? `${pet.name.slice(0, -1)}ies` : `${pet.name}s`)} join into 1 gold ${esc(pet.name)}. It's free, no coins.</p>
+      <div class="sheet-actions">
+        <button class="btn-soft" type="button" data-act="close">Not now</button>
+        <button class="btn-main" type="button" data-act="gold">Make gold</button>
+      </div>
+    </div>`);
+  body.querySelector('[data-act="close"]').addEventListener('click', closeSheet);
+  body.querySelector('[data-act="gold"]').addEventListener('click', () => makeGold(type));
+});
+const goldProgress = document.createElement('div');
+goldProgress.className = 'gold-progress'; goldProgress.hidden = true;
+petActions.before(goldProgress);
+
+function makeGold(type) {
+  if (isGold(type) || state.pets.filter((p) => p.type === type).length < 5) return;
+  let used = 0;
+  state.pets = state.pets.filter((p) => {
+    if (p.type === type && used < 5) { used++; return false; }
+    return true;
+  });
+  state.pets.push({ id: uid(), type, gold: true });
+  save();
+  sfx('hatch');
+  petStage?.setPet(type, { gold: true });
+  homeStage?.setPet(state.buddy, { gold: isGold(state.buddy) });
+  renderPets();
+  renderBuddy();
+  const pet = PETS[type];
+  const copies = pet.name.endsWith('y') ? `${pet.name.slice(0, -1)}ies` : `${pet.name}s`;
+  const body = openSheet(`
+    <div class="hatch revealed gold-reveal">
+      <div class="burst" aria-hidden="true"></div>
+      <img class="hatch-pet" src="${petPortrait(type, 320, { gold: true })}" alt="Gold ${esc(pet.name)} the ${esc(pet.species)}">
+      <h2 id="sheetTitle">Gold ${esc(pet.name)}!</h2>
+      <p class="fact">5 ${esc(copies)} joined into 1 gold ${esc(pet.name)}. Gold pets shine on walks!</p>
+      <div class="sheet-actions"><button class="btn-main" type="button" data-act="close">Yay!</button></div>
+    </div>`, { onClose: () => $('petGrid').querySelector('.sel')?.focus({ preventScroll: true }) });
+  body.querySelector('[data-act="close"]').addEventListener('click', closeSheet);
+  body.querySelector('[data-act="close"]').focus();
+}
+
 function renderPets() {
   const owned = new Map();
   state.pets.forEach((p) => owned.set(p.type, (owned.get(p.type) || 0) + 1));
   if (!owned.has(selected)) selected = state.buddy;
   const p = PETS[selected];
-  $('petName').textContent = p.name;
+  const gold = isGold(selected), count = owned.get(selected) || 0;
+  $('petName').textContent = `${gold ? 'Gold ' : ''}${p.name}`;
   $('petSpecies').textContent = p.species;
   $('petFact').textContent = p.fact;
   const rar = $('petRarity');
@@ -338,6 +399,12 @@ function renderPets() {
   const bb = $('buddyBtn');
   bb.disabled = selected === state.buddy;
   bb.textContent = selected === state.buddy ? 'Your buddy' : 'Make buddy';
+  goldBtn.hidden = gold || count < 5;
+  goldBtn.setAttribute('aria-label', `Make gold ${p.name} with 5 copies`);
+  goldProgress.hidden = gold || !count;
+  goldProgress.innerHTML = `
+    <span>Gold: ${Math.min(count, 5)} / 5</span>
+    <progress class="gold-bar" value="${Math.min(count, 5)}" max="5" aria-label="Copies for a gold ${esc(p.name)}"></progress>`;
 
   // Eggs
   $('eggCount').textContent = `${state.eggs.length} of 3`;
@@ -365,19 +432,21 @@ function renderPets() {
   PET_ORDER.forEach((type) => {
     const pet = PETS[type];
     const has = owned.has(type);
+    const gold = isGold(type), count = owned.get(type) || 0;
     const b = document.createElement('button');
     b.type = 'button';
-    b.className = `pet-card sticker${has ? '' : ' locked'}${type === selected && has ? ' sel' : ''}`;
+    b.className = `pet-card sticker${has ? '' : ' locked'}${type === selected && has ? ' sel' : ''}${gold ? ' is-gold' : ''}`;
     b.innerHTML = `
-      <img src="${petPortrait(type, 192)}" alt="">
+      <img src="${petPortrait(type, 192, { gold })}" alt="">
       <span class="pc-name">${has ? esc(pet.name) : '???'}</span>
-      <span class="pc-sub">${has ? (owned.get(type) > 1 ? `x${owned.get(type)}` : RARITY[pet.rarity].label) : RARITY[pet.rarity].label}</span>
+      <span class="pc-sub">${has ? `x${count}` : RARITY[pet.rarity].label}</span>
+      ${gold ? '<span class="pc-gold">Gold</span>' : count >= 5 ? '<span class="pc-gold-hint">5/5 Make gold!</span>' : ''}
       ${type === state.buddy ? '<span class="pc-buddy">Buddy</span>' : ''}`;
-    b.setAttribute('aria-label', has ? `${pet.name}, ${pet.species}` : `Not found yet, ${RARITY[pet.rarity].label}`);
+    b.setAttribute('aria-label', has ? `${gold ? 'Gold ' : ''}${pet.name}, ${pet.species}, x${count}${!gold && count >= 5 ? ', Make gold ready' : ''}` : `Not found yet, ${RARITY[pet.rarity].label}`);
     b.addEventListener('click', () => {
       if (!has) { toast(`Not found yet. ${RARITY[pet.rarity].label} eggs can hatch one.`); return; }
       selected = type;
-      petStage?.setPet(type);
+      petStage?.setPet(type, { gold: isGold(type) });
       renderPets();
     });
     grid.appendChild(b);
@@ -397,14 +466,14 @@ function showScreen(name) {
   });
   if (name === 'pets') {
     renderPets();
-    if (!petStage) petStage = createStage($('petStage'), { pet: selected, mode: 'viewer' });
-    else { petStage.setPet(selected); petStage.kick(); }
+    if (!petStage) petStage = createStage($('petStage'), { pet: selected, gold: isGold(selected), mode: 'viewer' });
+    else { petStage.setPet(selected, { gold: isGold(selected) }); petStage.kick(); }
   }
   if (name === 'home') homeStage?.kick();
   if (name === 'shop') showShop();
   if (name === 'quests') renderQuests();
   if (name === 'ranks') renderRanks();
-  if (name === 'me') renderMe();
+  if (name === 'me') { renderMe(); renderAlertsBtn(); }
   if (name === 'parent') renderParent();
   $(`screen-${name}`).scrollTop = 0;
   updateDots();
@@ -477,7 +546,7 @@ $('stepsNum').addEventListener('pointerdown', () => {
     Object.assign(state, DEFAULTS());
     save();
     shownSteps = 0; selected = state.buddy;
-    homeStage?.setPet(state.buddy);
+    homeStage?.setPet(state.buddy, { gold: isGold(state.buddy) });
     homeStage?.setOutfit(state.outfit);
     renderAll(true);
     toast('Demo reset');
@@ -575,7 +644,7 @@ function renderWalk() {
     $('wSafe').textContent = `Demo: you went past your ${safeKm()} km safe zone.`;
   } else {
     $('wSafe').textContent = walk.gpsState === 'off'
-      ? 'Location is off, so the safe zone check is paused.'
+      ? 'Location is off, so grown-ups cannot check your safe zone.'
       : 'Finding your location for the safe zone...';
   }
 }
@@ -617,6 +686,7 @@ async function startWalk() {
   };
   sfx('walkstart');
   $('walk').hidden = false;
+  homeOnWalk(true);
   document.body.classList.add('walking');
   $('walkAlert').hidden = true;
   setStatus('Starting', '');
@@ -644,15 +714,15 @@ async function startWalk() {
     walk.mode = 'off';
     setStatus('Not counting', 'paused');
     showAlert(result === 'denied'
-      ? 'Steps are not counting because motion access is off. Ask a grown-up to allow Motion for this website, then start again.'
+      ? 'Step counting is off, so your steps are not counting. Ask a grown-up to turn it on in Settings, then start again.'
       : 'This device cannot count steps. Try Stepsy on a phone.', 'info', 9000);
   } else {
     // Demo mode with no motion sensor (a computer, or permission was refused): run a gentle demo walk.
     walk.mode = 'demo';
     setStatus('Demo walk', 'demo');
     showAlert(result === 'denied'
-      ? 'Motion access is off, so this is a demo walk. You can turn it on in your browser settings.'
-      : 'No motion sensor here, so this is a demo walk.', 'info', 4500);
+      ? 'Step counting is off, so this is a demo walk. A grown-up can turn it on in Settings.'
+      : 'This device cannot count steps, so this is a demo walk.', 'info', 4500);
     walk.demoTimer = setInterval(() => { if (walk && !walk.paused) creditSteps(2); }, 1000);
   }
 }
@@ -686,6 +756,7 @@ function endWalk() {
       <div class="sheet-actions"><button class="btn-main" type="button" data-act="close">Done</button></div>
     </div>`, {
     onClose: () => {
+      homeOnWalk(false);
       $('walk').hidden = true;
       document.body.classList.remove('walking');
       renderAll(true);
@@ -791,7 +862,7 @@ function gate(onPass) {
 const INTRO = [
   { art: () => `<span class="intro-ico">${ICONS.feet}</span>`, title: 'Walk to play!', text: 'Every step you walk helps you grow and earns coins.' },
   { art: () => eggArt(RARITY.common.egg), title: 'Find eggs', text: 'Eggs pop up on your walks. Keep walking and they hatch!' },
-  { art: () => `<img src="${petPortrait('otter', 240)}" alt="">`, title: 'Meet Kallie!', text: 'Kallie the otter is your first buddy. Hatch more Singapore animals.' },
+  { art: () => `<img src="${petPortrait('otter', 240, { gold: isGold('otter') })}" alt="">`, title: 'Meet Kallie!', text: 'Kallie the otter is your first buddy. Hatch more Singapore animals.' },
   { art: () => `<span class="intro-ico coin">${coinSVG}</span>`, title: 'Get coins', text: 'Use coins in the Shop for hats and fun stuff. No real money.' },
   { art: () => `<span class="intro-ico">${ICONS.shield}</span>`, title: 'Stay safe', text: 'Ask a grown-up before you walk. Look up when you cross a road.' },
 ];
@@ -836,13 +907,7 @@ function showIntro() {
         state.nickname = name;
         state.onboarded = true;
         save();
-        box.hidden = true; box.innerHTML = '';
-        trapTo();
-        renderAll(true);
-        renderTop();
-        sfx('cheer');
-        toast(`Hi ${name}! Tap Start walk to begin.`);
-        showTip('home');
+        perms(name);
       });
     }
     box.querySelector('[data-act="next"]')?.addEventListener('click', () => { i++; draw(); });
@@ -852,6 +917,45 @@ function showIntro() {
     (moved ? box.querySelector('#introName, [data-act="next"]') : box.querySelector('.intro-card'))?.focus({ preventScroll: true });
     moved = true;
   }
+  // Last slide: let Stepsy count steps, check the safe zone and send alerts. All optional.
+  function perms(name) {
+    const row = (id, ico, title, text) => `
+      <li class="perm" data-perm="${id}">
+        <span class="perm-ico">${ICONS[ico]}</span>
+        <span class="perm-txt"><strong>${title}</strong><span>${text}</span></span>
+        <button class="btn-soft sm" type="button" data-ask="${id}">Allow</button>
+      </li>`;
+    box.innerHTML = `
+      <div class="intro-card sticker perm-card" role="dialog" aria-modal="true" aria-labelledby="introTitle" tabindex="-1">
+        <h2 id="introTitle">Let Stepsy help you</h2>
+        <p>Ask a grown-up, then tap Allow. The phone will ask too.</p>
+        <ul class="perm-list">
+          ${row('motion', 'feet', 'Count my steps', 'So your walks count.')}
+          ${row('location', 'shield', 'Safe zone', 'Only on walks, so grown-ups know you are safe.')}
+          ${row('alerts', 'bell', 'Alerts', 'When your egg is ready or a friend cheers.')}
+        </ul>
+        <p class="muted small">You can change these later in the phone's Settings.</p>
+        <div class="intro-btns"><button class="btn-main" type="button" data-act="done">Let's go!</button></div>
+      </div>`;
+    const ask = { motion: askMotion, location: askLocation, alerts: askAlerts };
+    box.querySelectorAll('[data-ask]').forEach((b) => b.addEventListener('click', async () => {
+      b.disabled = true; b.textContent = 'Asking...';
+      const r = await ask[b.dataset.ask]();
+      b.textContent = r === 'granted' ? 'On' : r === 'none' ? 'Not here' : 'Off';
+      b.closest('.perm').classList.add(r === 'granted' ? 'on' : 'off');
+      sfx(r === 'granted' ? 'claim' : 'tap');
+    }));
+    box.querySelector('[data-act="done"]').addEventListener('click', () => {
+      box.hidden = true; box.innerHTML = '';
+      trapTo();
+      renderAll(true);
+      renderTop();
+      sfx('cheer');
+      toast(`Hi ${name}! Tap Start walk to begin.`);
+      showTip('home');
+    });
+    box.querySelector('.intro-card').focus({ preventScroll: true });
+  }
   let moved = false;
   box.hidden = false;
   trapTo($('intro'), $('toast'));
@@ -860,12 +964,12 @@ function showIntro() {
 
 // ---------------- First visit to each screen: one short tip ----------------
 const TIPS = {
-  home: 'Tap Start walk and go! Keep the app open to count steps. Tap your picture at the top to see your badges.',
+  home: 'Tap Start walk and go! Keep the app open to count steps. Tap Me at the bottom to see your badges.',
   pets: 'Your eggs and pets live here. Tap a pet to see it up close.',
-  shop: 'Tap anything to try it on. Like it? Buy it with coins.',
+  shop: 'Tap anything to try it on. Looks are free. Hats, glasses and fun stuff cost coins.',
   quests: 'Fill up a bar, then tap Claim to get coins.',
   ranks: 'See who walked the most this week in your class.',
-  me: 'Your badges and friends live here. To add a friend, meet them and tap Add friend.',
+  me: 'This is your profile. Tap a badge to see how to get it. Tap a friend to see theirs.',
 };
 function showTip(name) {
   if (!state.onboarded || state.tips[name] || !TIPS[name]) return;
@@ -902,4 +1006,54 @@ setInterval(() => { if (!document.hidden && !walk) wobble($('homeEgg')); }, 6000
 // App left open past midnight: start the new day without waiting for a step or a tab switch.
 setInterval(() => { if (!walk && state.day !== todayKey()) { rollDay(); renderAll(false); } }, 30000);
 
-homeStage = createStage($('stage'), { outfit: state.outfit, pet: state.buddy, mode: 'home', onReady: setBadge });
+homeStage = createStage($('stage'), { outfit: state.outfit, pet: state.buddy, gold: isGold(state.buddy), mode: 'home', onReady: setBadge });
+
+// ---------------- Walk scene: the Home 3D picture moves into the walk screen and walks ----------------
+let stageSpot = null;
+function homeOnWalk(on) {
+  const el = $('stage');
+  if (on) {
+    stageSpot = { parent: el.parentElement, next: el.nextSibling };
+    $('walkScene').appendChild(el);
+    homeStage?.play('walk');
+  } else if (stageSpot) {
+    stageSpot.parent.insertBefore(el, stageSpot.next);
+    stageSpot = null;
+    homeStage?.play(state.outfit.hold ? 'holding-right' : 'idle');
+  }
+  homeStage?.kick();
+}
+
+// ---------------- Alerts (pretend notifications for the prototype) ----------------
+initNotify();
+function renderAlertsBtn() {
+  const s = alertsState(), b = $('alertsBtn');
+  b.textContent = s === 'granted' ? 'Test alert' : s === 'denied' ? 'Off' : s === 'none' ? 'Not here' : 'Turn on';
+  b.disabled = s === 'denied' || s === 'none';
+  $('alertsNote').textContent = s === 'granted' ? 'On. Tap Test alert to see one.'
+    : s === 'denied' ? 'Turned off. A grown-up can turn them on in the phone\'s Settings.'
+    : s === 'none' ? 'On iPhone: Share, then Add to Home Screen, then open Stepsy from there.'
+    : 'A ping when your egg is ready or a friend cheers.';
+}
+$('alertsBtn').addEventListener('click', async () => {
+  if (alertsState() === 'granted') {
+    const f = state.friends.length ? ['Aisyah', 'Jun Hao', 'Priya', 'Kai', 'Mei Ling'][state.friends.length % 5] : 'Kallie';
+    notify(state.friends.length ? `${f} cheered you!` : 'Kallie misses you!', state.friends.length ? '"Nice walk!" Open Stepsy to cheer back.' : 'Go for a walk together?', { toast, tag: 'test' });
+  } else await askAlerts();
+  renderAlertsBtn();
+});
+// A friend's cheer and an evening streak reminder, at most once a day each.
+function pretendAlerts() {
+  if (document.hidden || walk || !state.onboarded) return;
+  const today = state.day;
+  if (state.streak > 0 && !state.walkDays.includes(today) && new Date().getHours() >= 17 && state.remindDay !== today) {
+    state.remindDay = today; save();
+    notify('Keep your streak!', `Walk 1,000 steps today to make it ${state.streak + 1} days in a row.`, { toast, tag: 'streak' });
+  } else if (state.friends.length && state.cheerDay !== today) {
+    state.cheerDay = today; save();
+    const f = ['Aisyah', 'Priya', 'Jun Hao'][new Date().getDate() % 3];
+    notify(`${f} cheered you!`, '"Let\'s walk together!"', { toast, tag: 'cheer' });
+  }
+}
+setTimeout(pretendAlerts, 45000);
+document.addEventListener('visibilitychange', () => { if (!document.hidden) setTimeout(pretendAlerts, 4000); });

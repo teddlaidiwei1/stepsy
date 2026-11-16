@@ -48,7 +48,7 @@ const QUESTS = [
   { id: 'd-egg', when: 'day', title: 'Find an egg on a walk', reward: 30, art: () => eggArt(), prog: () => [today().eggs, 1] },
   { id: 'w-days', when: 'week', title: 'Walk on 5 different days this week', reward: 120, art: () => ICONS.feet, prog: () => [week().days, 5], unit: 'days' },
   { id: 'w-hatch', when: 'week', title: 'Hatch a pet this week', reward: 80, art: () => ICONS.pets, prog: () => [week().hatched, 1] },
-  { id: 'w-class', when: 'week', title: 'Help your class walk 20 km together', reward: 150, team: true, art: () => ICONS.ranks, prog: () => [week().classKm, 20], unit: 'km' },
+  { id: 'w-class', when: 'week', title: 'Help your class walk 20 km (about 36,000 steps)', reward: 150, team: true, art: () => ICONS.ranks, prog: () => [week().classKm, 20], unit: 'km' },
 ];
 const keyOf = (q) => `${q.id}@${q.when === 'day' ? ctx.state.day : weekKey()}`;
 const done = (q) => { const [a, b] = q.prog(); return a >= b; };
@@ -59,8 +59,10 @@ export const claimable = () => QUESTS.filter((q) => done(q) && !claimed(q)).leng
 export function earnedBadges() {
   const { state } = ctx;
   const got = new Set(state.badges);
-  if (state.walks.length) got.add('first');
+  if (state.walks.some((w) => w.steps > 0)) got.add('first');
+  if (state.walks.some((w) => w.eggs > 0) || state.hatched.length) got.add('egg');
   if (state.steps >= 5000) got.add('5k');
+  if (state.pets.some((p) => p.gold)) got.add('gold');
   if (state.streak >= 7) got.add('week');
   if (new Set(state.pets.map((p) => p.type)).size >= 3) got.add('collector');
   if (week().km >= 10) got.add('explorer');
@@ -69,6 +71,55 @@ export function earnedBadges() {
 export function badgeArt(b) {
   const inner = b.icon === 'egg' ? eggArt() : ICONS[b.icon];
   return `<span class="badge-art" style="--bg:${b.color}">${inner}</span>`;
+}
+
+// How close you are to each badge: [now, goal, unit].
+const mostOfOne = (pets) => { const n = {}; pets.forEach((p) => { n[p.type] = (n[p.type] || 0) + 1; }); return Math.max(0, ...Object.values(n)); };
+const BADGE_PROG = {
+  first: () => [ctx.state.walks.filter((w) => w.steps > 0).length, 1, 'walk'],
+  egg: () => [ctx.state.walks.reduce((s, w) => s + (w.eggs || 0), 0) + ctx.state.hatched.length, 1, 'egg'],
+  '5k': () => [ctx.state.steps, 5000, 'steps today'],
+  week: () => [ctx.state.streak, 7, 'days in a row'],
+  collector: () => [new Set(ctx.state.pets.map((p) => p.type)).size, 3, 'animals'],
+  explorer: () => [week().km, 10, 'km this week'],
+  gold: () => [mostOfOne(ctx.state.pets.filter((p) => !p.gold)), 5, 'of the same animal'],
+};
+// Badges as big buttons: earned ones in colour, the rest greyed out. Tapping one opens its card.
+export function badgeButtons(earnedIds, owner = null) {
+  return BADGES.map((b) => {
+    const has = earnedIds.includes(b.id);
+    return `<li class="${has ? '' : 'locked'}"><button type="button" class="badge-btn" data-badge="${b.id}" aria-label="${ctx.esc(b.name)}${has ? '' : ', not yet'}">${badgeArt(b)}<span>${ctx.esc(b.name)}</span></button></li>`;
+  }).join('');
+}
+export function wireBadges(listEl, owner = null) {
+  listEl.querySelectorAll('[data-badge]').forEach((btn) => btn.addEventListener('click', () => openBadge(btn.dataset.badge, owner)));
+}
+// The badge card. owner = null for you (shows your progress), or { name, badges } for someone else.
+export function openBadge(id, owner = null) {
+  const { esc, fmt, openSheet, closeSheet } = ctx;
+  const b = BADGES.find((x) => x.id === id);
+  const has = owner ? owner.badges.includes(id) : earnedBadges().some((x) => x.id === id);
+  let status = '';
+  if (owner) status = `<p class="bd-status${has ? ' got' : ''}">${has ? `${esc(owner.name)} has this badge!` : `${esc(owner.name)} doesn't have this one yet.`}</p>`;
+  else if (has) status = '<p class="bd-status got">You got it!</p>';
+  else {
+    const [now, goal, rawUnit] = BADGE_PROG[id]();
+    const unit = rawUnit;
+    const kmToSteps = (k) => Math.round(k / 0.00055 / 100) * 100;
+    const shown = unit.startsWith('km') ? `${fmt(kmToSteps(Math.min(now, goal)))} / ${fmt(kmToSteps(goal))}` : `${fmt(Math.min(now, goal))} / ${fmt(goal)}`;
+    status = `<p class="bd-status">Not yet. Keep going!</p>
+      <span class="bar" aria-hidden="true"><span style="width:${Math.min(now / goal, 1) * 100}%"></span></span>
+      <p class="bd-num num">${shown} ${esc(unit.startsWith('km') ? 'steps this week' : unit)}</p>`;
+  }
+  const body = openSheet(`
+    <div class="badge-card${has ? '' : ' locked'}">
+      <div class="bd-art">${badgeArt(b)}</div>
+      <h2 id="sheetTitle">${esc(b.name)}</h2>
+      <p class="bd-how"><strong>How to get it:</strong> ${esc(b.how)}</p>
+      ${status}
+      <div class="sheet-actions"><button class="btn-main" type="button" data-act="close">OK</button></div>
+    </div>`);
+  body.querySelector('[data-act="close"]').addEventListener('click', closeSheet);
 }
 // Keeps state.badges up to date and tells the kid about a new one.
 export function checkBadges() {
@@ -153,6 +204,6 @@ export function renderQuests() {
 
   const earned = earnedBadges().map((b) => b.id);
   $('badgeCount').textContent = `${earned.length} of ${BADGES.length}`;
-  $('badgeGrid').innerHTML = BADGES.map((b) => `
-    <li class="${earned.includes(b.id) ? '' : 'locked'}">${badgeArt(b)}<span>${b.name}</span></li>`).join('');
+  $('badgeGrid').innerHTML = badgeButtons(earned);
+  wireBadges($('badgeGrid'));
 }

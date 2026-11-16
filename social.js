@@ -1,10 +1,10 @@
 // Ranks, your profile with friends (added in person by QR, cheers only) and the parent view.
 import { play as sfx, soundOn, setSound } from './sfx.js';
 import { avatarPicture } from './avatar3d.js';
-import { petPortrait } from './scene.js';
-import { PETS } from './pets.js';
-import { BADGES, FRIENDS, NEW_FRIEND, CHEERS, CHEERS_IN, ME, classBoard, schoolBoard, sgBoard, HOME_SPOT, DEMO_PATH, DANGER_SPOTS } from './data.js';
-import { earnedBadges, badgeArt } from './quests.js';
+import { petPortrait, createStage } from './scene.js';
+import { PETS, PET_ORDER } from './pets.js';
+import { BADGES, FRIENDS, NEW_FRIEND, CHEERS, CHEERS_IN, ME, classBoard, schoolBoard, sgBoard, seeded, HOME_SPOT, DEMO_PATH, DANGER_SPOTS } from './data.js';
+import { earnedBadges, badgeButtons, wireBadges } from './quests.js';
 
 let ctx;
 let board = 'class';
@@ -50,7 +50,7 @@ export function initSocial(c) {
   const showSnd = () => { snd.textContent = soundOn() ? 'Sound: on' : 'Sound: off'; snd.setAttribute('aria-pressed', soundOn()); };
   snd.addEventListener('click', () => { setSound(!soundOn()); showSnd(); });
   showSnd();
-  $('meBack').addEventListener('click', () => ctx.showScreen('home'));
+  $('meBack').addEventListener('click', () => ctx.showScreen(current ? backTo : 'home'));
   $('parentBack').addEventListener('click', () => ctx.showScreen('me'));
   $('safeSeg').addEventListener('click', (e) => {
     const b = e.target.closest('[data-km]');
@@ -101,6 +101,7 @@ export function renderRanks() {
       <span class="rav">${board === 'class' ? '<img alt="">' : `<span class="mono">${esc(r.name.replace(' Primary', '').slice(0, 2))}</span>`}</span>
       <span class="rn">${r.you && board === 'class' ? `${esc(ctx.state.nickname)} (you)` : esc(r.name)}${r.you && board !== 'class' ? ' <em>yours</em>' : ''}</span>
       <span class="rs num">${fmt(r.steps)}</span>
+      ${board === 'class' ? `<button class="rank-hit" type="button" aria-label="${r.you ? 'Your profile' : `See ${esc(r.name)}'s profile`}"></button>` : ''}
     </li>`).join('');
   if (board === 'class') {
     list.querySelectorAll('.rank-row').forEach((li, i) => {
@@ -108,26 +109,94 @@ export function renderRanks() {
       const img = li.querySelector('img');
       if (r.you) { const b = document.querySelector('#badge img'); if (b) img.src = b.src; else avatarPicture(ctx.state.outfit, { size: 96, head: true }).then((s) => { img.src = s; }); }
       else avatarPicture({ look: r.look }, { size: 96, head: true }).then((s) => { img.src = s; });
+      li.querySelector('.rank-hit').addEventListener('click', () => (r.you ? ctx.showScreen('me') : showProfile(classmate(r))));
     });
   }
 }
 
-// ---------------- Me: profile, badges, cheers, friends ----------------
+// ---------------- Profile page: yours, a friend's or a classmate's (same page) ----------------
+let viewing = null, current = null, backTo = 'home', profStage = null;
+const hashName = (t) => [...t].reduce((h, c) => (h * 31 + c.charCodeAt(0)) | 0, 7);
+// Classmates from Ranks: your friends show their real profile; other kids get a made-up one (demo).
+function classmate(r) {
+  const friend = [...FRIENDS, NEW_FRIEND].find((f) => f.name === r.name && ctx.state.friends.includes(f.id));
+  if (friend) return { ...friend, friend: true };
+  const rnd = seeded(hashName(r.name));
+  const commons = PET_ORDER.filter((t) => PETS[t].rarity === 'common');
+  const buddy = commons[Math.floor(rnd() * commons.length)];
+  const pets = [...new Set([buddy, ...PET_ORDER.filter(() => rnd() < 0.3)])];
+  const badges = BADGES.filter((b, i) => i === 0 || (b.id !== 'gold' && rnd() < 0.4)).map((b) => b.id);
+  return {
+    name: r.name, cls: ME.cls, outfit: { look: r.look }, buddy, pets, badges,
+    today: Math.round(1200 + rnd() * 5200), streak: Math.floor(rnd() * 10), level: 2 + Math.floor(r.steps / 6000), friend: false,
+  };
+}
+export function showProfile(p) {
+  viewing = p;
+  backTo = document.body.dataset.view || 'home';
+  ctx.showScreen('me');
+}
+
 export function renderMe() {
   const { $, esc, fmt, state } = ctx;
-  $('meName').textContent = state.nickname;
-  $('meSub').textContent = state.demo ? `${ME.cls} · ${ME.school} (demo)` : 'Keep walking to level up!';
+  const who = viewing; viewing = null; current = who;
+  $('screen-me').dataset.who = who ? 'friend' : 'me';
+  const name = who ? who.name : state.nickname;
+  $('profTitle').textContent = who ? (who.friend ? 'Friend' : 'Classmate') : 'Me';
+  $('meName').textContent = name;
+  $('meSub').textContent = who ? `Class ${who.cls}${who.friend ? ' · Your friend' : ''}`
+    : state.demo ? `${ME.cls} · ${ME.school} (demo)` : 'Keep walking to level up!';
+
+  // Big 3D picture: the avatar with their buddy (gold if they made it gold).
+  const outfit = who ? who.outfit : state.outfit;
+  const buddy = who ? who.buddy : state.buddy;
+  const goldSet = new Set(who ? (who.gold || []) : state.pets.filter((p) => p.gold).map((p) => p.type));
+  if (!profStage) profStage = createStage($('profStage'), { outfit, pet: buddy, mode: 'home' });
+  else profStage.setOutfit(outfit);
+  profStage.setPet(buddy, { gold: goldSet.has(buddy) });
+  profStage.kick();
+
+  // Their own numbers, big.
+  const counts = new Map();
+  if (who) who.pets.forEach((t) => counts.set(t, 1));
+  else state.pets.forEach((p) => counts.set(p.type, (counts.get(p.type) || 0) + 1));
+  const stats = who ? [who.today, who.streak, who.level, counts.size] : [state.steps, state.streak, state.level, counts.size];
+  const labels = ['steps today', stats[1] === 1 ? 'day in a row' : 'days in a row', 'level', counts.size === 1 ? 'animal' : 'animals'];
+  $('meStats').innerHTML = stats.map((v, i) => `<div class="ps"><span class="num">${fmt(v)}</span><span>${labels[i]}</span></div>`).join('');
+
+  // Every badge: earned ones in colour. Tap for the badge card.
+  const earned = who ? who.badges : earnedBadges().map((b) => b.id);
+  $('meBadgeTitle').textContent = who ? `${name}'s badges` : 'My badges';
+  $('meBadgeCount').textContent = `${earned.length} of ${BADGES.length}`;
+  $('meBadges').innerHTML = badgeButtons(earned);
+  wireBadges($('meBadges'), who ? { name, badges: earned } : null);
+
+  // Animals they have.
+  $('mePetTitle').textContent = who ? `${name}'s animals` : 'My animals';
+  $('mePetCount').textContent = `${counts.size} of ${PET_ORDER.length}`;
+  $('mePets').innerHTML = PET_ORDER.filter((t) => counts.has(t)).map((t) => `
+    <li class="${goldSet.has(t) ? 'gold' : ''}">
+      <img src="${petPortrait(t, 128, { gold: goldSet.has(t) })}" alt="">
+      <span class="pn">${esc(PETS[t].name)}</span>
+      <span class="pt">${t === buddy ? 'Buddy' : goldSet.has(t) ? 'Gold' : counts.get(t) > 1 ? `x${counts.get(t)}` : '&nbsp;'}</span>
+    </li>`).join('');
+
+  if (who) {
+    // Cheers only for friends you added in person. No chat.
+    $('sendCheerTitle').textContent = who.friend ? 'Send a cheer' : 'Not your friend yet';
+    $('profCheers').innerHTML = who.friend ? CHEERS.map((c) => `<button class="chip" type="button">${esc(c)}</button>`).join('') : '';
+    $('profNote').textContent = who.friend ? 'Friends can only send cheers. There is no chat.'
+      : `You can add ${name} as a friend when you meet in person. Then you can send cheers.`;
+    $('profCheers').querySelectorAll('.chip').forEach((b) => b.addEventListener('click', () => {
+      sfx('cheer');
+      ctx.toast(`Cheer sent to ${name}: "${b.textContent}"`);
+    }));
+    return;
+  }
+
   $('demoBtn').textContent = state.demo ? 'Turn off' : 'Turn on';
   $('demoBtn').setAttribute('aria-pressed', String(!!state.demo));
   $('demoNote').textContent = state.demo ? 'Showing made-up demo data. Turn off to go back to your own progress.' : 'For showing the app. Your own progress is kept safe.';
-  avatarPicture(state.outfit, { size: 240 }).then((s) => { $('meAvatar').src = s; });
-  $('meStats').innerHTML = `
-    <div><span class="num">${fmt(state.steps)}</span><span>steps today</span></div>
-    <div><span class="num">${new Set(state.pets.map((p) => p.type)).size}</span><span>${new Set(state.pets.map((p) => p.type)).size === 1 ? 'pet' : 'pets'}</span></div>
-    <div><span class="num">${state.level}</span><span>level</span></div>`;
-  const myBadges = earnedBadges();
-  $('meBadges').innerHTML = myBadges.length ? myBadges.map((b) => `<li>${badgeArt(b)}<span>${esc(b.name)}</span></li>`).join('')
-    : '<li class="empty">No badges yet. Finish your first walk to get one!</li>';
   $('cheersIn').innerHTML = !state.demo && !state.friends.length
     ? '<li class="empty">No cheers yet. Add friends and they can cheer you on.</li>'
     : CHEERS_IN.map((c) => `<li><strong>${esc(c.from)}</strong> sent "${esc(c.text)}" <span class="muted small">${esc(c.ago)}</span></li>`).join('');
@@ -144,44 +213,12 @@ export function renderMe() {
       <span class="fav"><img alt=""></span>
       <span class="fn">${esc(f.name)}</span>
       <span class="fs muted small">${esc(f.cls)} · <span class="num">${fmt(f.today)}</span> steps</span>
-      <img class="fpet" src="${petPortrait(f.buddy, 96)}" alt="">`;
-    b.setAttribute('aria-label', `${f.name}, ${fmt(f.today)} steps today`);
+      <img class="fpet" src="${petPortrait(f.buddy, 96, { gold: (f.gold || []).includes(f.buddy) })}" alt="">`;
+    b.setAttribute('aria-label', `${f.name}, ${fmt(f.today)} steps today. See profile`);
     avatarPicture(f.outfit, { size: 128, head: true }).then((s) => { b.querySelector('.fav img').src = s; });
-    b.addEventListener('click', () => openFriend(f));
+    b.addEventListener('click', () => showProfile({ ...f, friend: true }));
     grid.appendChild(b);
   });
-}
-
-function openFriend(f) {
-  const { esc, fmt, openSheet, closeSheet, toast } = ctx;
-  const badges = earnedBadgesFor(f);
-  const body = openSheet(`
-    <div class="friend-sheet">
-      <div class="fs-top">
-        <img class="fs-av" alt="${esc(f.name)}'s avatar">
-        <img class="fs-pet" src="${petPortrait(f.buddy, 160)}" alt="${esc(PETS[f.buddy].name)} the ${esc(PETS[f.buddy].species)}">
-      </div>
-      <h2 id="sheetTitle">${esc(f.name)}</h2>
-      <p class="muted">Class ${esc(f.cls)} · <span class="num">${fmt(f.today)}</span> steps today</p>
-      <p class="fs-label">Pets</p>
-      <div class="fs-pets">${f.pets.map((p) => `<img src="${petPortrait(p, 96)}" alt="${esc(PETS[p].name)}">`).join('')}</div>
-      <p class="fs-label">Badges</p>
-      <ul class="badge-row">${badges.map((b) => `<li>${badgeArt(b)}<span>${esc(b.name)}</span></li>`).join('')}</ul>
-      <p class="fs-label">Send a cheer</p>
-      <div class="cheers">${CHEERS.map((c) => `<button class="chip" type="button">${esc(c)}</button>`).join('')}</div>
-      <p class="muted small">Friends can only send cheers. There is no chat.</p>
-      <div class="sheet-actions"><button class="btn-soft" type="button" data-act="close">Close</button></div>
-    </div>`);
-  avatarPicture(f.outfit, { size: 240 }).then((s) => { const i = body.querySelector('.fs-av'); if (i) i.src = s; });
-  body.querySelectorAll('.cheers .chip').forEach((b) => b.addEventListener('click', () => {
-    sfx('cheer');
-    closeSheet();
-    toast(`Cheer sent to ${f.name}: "${b.textContent}"`);
-  }));
-  body.querySelector('[data-act="close"]').addEventListener('click', closeSheet);
-}
-function earnedBadgesFor(f) {
-  return BADGES.filter((b) => f.badges.includes(b.id));
 }
 
 async function openAddFriend() {

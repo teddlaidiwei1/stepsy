@@ -23,7 +23,7 @@ const INK = '#2B1710';
 function eyes(head, x, y, z, size = 0.07) {
   for (const s of [-1, 1]) {
     put(head, rbox(size, size * 1.2, 0.03, INK, 0.015), x * s, y, z);
-    put(head, rbox(size * 0.35, size * 0.35, 0.01, '#ffffff', 0.004), x * s + size * 0.2, y + size * 0.3, z + 0.017);
+    put(head, rbox(size * 0.35, size * 0.35, 0.01, '#ffffff', 0.004), x * s + size * 0.2, y + size * 0.3, z + 0.017).userData.keepColor = true;
   }
 }
 function cheeks(head, x, y, z) {
@@ -198,12 +198,22 @@ function turtle() {
 }
 
 const BUILDERS = { otter, kingfisher, monitor, hornbill, pangolin, mousedeer, turtle };
-export function makePet(type) {
+export function makePet(type, { gold = false } = {}) {
   const inner = (BUILDERS[type] || otter)();
+  if (gold) {
+    const dark = new Set(['5e3a24', '1f5fb0', '3e4a2c', '7a5032', '7a4a2a', '6b3a17', '8c6a3a']);
+    inner.traverse((o) => {
+      if (!o.isMesh || o.userData.keepColor) return;
+      const m = o.material, color = m.color.getHexString();
+      if (['2b1710', '26262b', '4a4a50'].includes(color)) return;
+      m.color.set(dark.has(color) ? '#D9A21B' : '#F2C14E');
+      m.metalness = 0.4; m.roughness = 0.35;
+    });
+  }
   // Wrap so stages can set scale/rotation freely; small animals get a size boost to read at a glance.
   const g = new THREE.Group();
   inner.scale.setScalar({ monitor: 1.3, pangolin: 1.25, turtle: 1.1 }[type] || 1);
   g.add(inner);
-  g.userData = { ...inner.userData, type };
+  g.userData = { ...inner.userData, type, gold };
   return g;
 }

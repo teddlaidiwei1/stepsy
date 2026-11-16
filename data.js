@@ -38,12 +38,13 @@ export const SHOP_TABS = [
 
 // Badges show on your profile and your friends' profiles.
 export const BADGES = [
-  { id: 'first', name: 'First walk', color: '#C6EBFB', icon: 'feet' },
-  { id: 'egg', name: 'Egg finder', color: '#FFF1C2', icon: 'egg' },
-  { id: '5k', name: '5k club', color: '#FFD0D6', icon: 'feet' },
-  { id: 'week', name: '7-day streak', color: '#DFF6E8', icon: 'quests' },
-  { id: 'collector', name: '3 pets', color: '#ECE3FF', icon: 'pets' },
-  { id: 'explorer', name: '10 km', color: '#FFE1D4', icon: 'ranks' },
+  { id: 'first', name: 'First walk', color: '#C6EBFB', icon: 'feet', how: 'Finish your first walk.' },
+  { id: 'egg', name: 'Egg finder', color: '#FFF1C2', icon: 'egg', how: 'Find an egg on a walk.' },
+  { id: '5k', name: '5k club', color: '#FFD0D6', icon: 'feet', how: 'Walk 5,000 steps in one day.' },
+  { id: 'week', name: '7-day streak', color: '#DFF6E8', icon: 'quests', how: 'Walk 1,000 steps every day, 7 days in a row.' },
+  { id: 'collector', name: '3 pets', color: '#ECE3FF', icon: 'pets', how: 'Collect 3 different animals.' },
+  { id: 'explorer', name: '10 km', color: '#FFE1D4', icon: 'ranks', how: 'Walk 10 km in one week. That is about 18,000 steps.' },
+  { id: 'gold', name: 'Gold pet', color: '#FFE9A8', icon: 'crown', how: 'Get 5 of the same animal, then make it gold on the Pets screen.' },
 ];
 
 export const CHEERS = ['Nice walk!', "Let's walk together!", 'Every step counts!', 'Cute pet!', 'You can do it!', 'High five!'];
@@ -51,13 +52,13 @@ export const CHEERS = ['Nice walk!', "Let's walk together!", 'Every step counts!
 export const ME = { cls: '5B', school: 'Sunbird Primary', code: 'WJ-4821' };
 
 export const FRIENDS = [
-  { id: 'f1', name: 'Aisyah', cls: '5B', outfit: { look: 'female-c.3', hat: 'bucket' }, buddy: 'kingfisher', pets: ['kingfisher', 'otter', 'pangolin'], badges: ['first', 'egg', '5k', 'week'], today: 4210 },
-  { id: 'f2', name: 'Jun Hao', cls: '5B', outfit: { look: 'male-b', hat: 'cap-sky' }, buddy: 'monitor', pets: ['monitor', 'otter'], badges: ['first', 'egg'], today: 2980 },
-  { id: 'f3', name: 'Priya', cls: '5A', outfit: { look: 'female-e' }, buddy: 'hornbill', pets: ['hornbill', 'kingfisher', 'otter', 'mousedeer'], badges: ['first', 'egg', 'collector', 'week', 'explorer'], today: 5120 },
-  { id: 'f4', name: 'Kai', cls: '5C', outfit: { look: 'male-e', eyes: 'sunglasses' }, buddy: 'otter', pets: ['otter'], badges: ['first'], today: 1640 },
+  { id: 'f1', name: 'Aisyah', cls: '5B', outfit: { look: 'female-c.3', hat: 'bucket' }, buddy: 'kingfisher', pets: ['kingfisher', 'otter', 'pangolin'], badges: ['first', 'egg', '5k', 'week'], today: 4210, streak: 9, level: 8 },
+  { id: 'f2', name: 'Jun Hao', cls: '5B', outfit: { look: 'male-b', hat: 'cap-sky' }, buddy: 'monitor', pets: ['monitor', 'otter'], badges: ['first', 'egg'], today: 2980, streak: 2, level: 4 },
+  { id: 'f3', name: 'Priya', cls: '5A', outfit: { look: 'female-e' }, buddy: 'hornbill', pets: ['hornbill', 'kingfisher', 'otter', 'mousedeer'], badges: ['first', 'egg', 'collector', 'week', 'explorer', 'gold'], today: 5120, streak: 12, level: 11, gold: ['otter'] },
+  { id: 'f4', name: 'Kai', cls: '5C', outfit: { look: 'male-e', eyes: 'sunglasses' }, buddy: 'otter', pets: ['otter'], badges: ['first'], today: 1640, streak: 0, level: 2 },
 ];
 // Someone you can add with the demo QR scan.
-export const NEW_FRIEND = { id: 'f5', name: 'Mei Ling', cls: '5B', outfit: { look: 'female-b', hat: 'strawberry' }, buddy: 'pangolin', pets: ['pangolin', 'otter'], badges: ['first', 'egg', '5k'], today: 3870 };
+export const NEW_FRIEND = { id: 'f5', name: 'Mei Ling', cls: '5B', outfit: { look: 'female-b', hat: 'strawberry' }, buddy: 'pangolin', pets: ['pangolin', 'otter'], badges: ['first', 'egg', '5k'], today: 3870, streak: 4, level: 6 };
 
 export const CHEERS_IN = [
   { from: 'Aisyah', text: 'Nice walk!', ago: '2 h ago' },
@@ -65,7 +66,7 @@ export const CHEERS_IN = [
 ];
 
 // Leaderboards ---------------------------------------------------------------
-function seeded(seed) {
+export function seeded(seed) {
   return () => { seed |= 0; seed = (seed + 0x6D2B79F5) | 0; let t = Math.imul(seed ^ (seed >>> 15), 1 | seed); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
 }
 const GIRLS = ['Aisyah', 'Mei Ling', 'Nur Iman', 'Hana', 'Sofia', 'Chloe', 'Divya', 'Xin Yi', 'Isabelle', 'Zi Xuan', 'Kavya', 'Alya'];

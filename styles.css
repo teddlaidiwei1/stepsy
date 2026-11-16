@@ -290,7 +290,7 @@ h2 { margin: 0; font-size: 17px; font-weight: 800; line-height: 1.2; }
 .walk-btn:active { transform: translateY(3px); border-bottom-width: 3px; }
 .tabs {
   display: grid;
-  grid-template-columns: repeat(5, 1fr);
+  grid-template-columns: repeat(6, 1fr);
   border-radius: 24px;
   padding: 6px;
 }
@@ -735,3 +735,73 @@ body:not(.demo) .demo-only { display: none !important; }
 .streak { position: relative; }
 .streak::after { content: ''; position: absolute; inset: -6px 0; }
 .streak.zero { background: var(--card-soft); color: var(--ink); }
+
+/* ---------- Profile page (yours, a friend's or a classmate's) ---------- */
+#screen-me[data-who="friend"] .own-only, #screen-me[data-who="me"] .friend-only { display: none !important; }
+.prof-hero { border-radius: var(--r-lg); overflow: hidden; padding: 0; }
+.prof-stage { position: relative; height: clamp(230px, 34vh, 300px); background: var(--sky); border-bottom: var(--line) solid var(--ink); }
+.prof-name { padding: 10px 16px 12px; text-align: center; }
+.prof-name h2 { font-size: 30px; line-height: 1.05; overflow-wrap: anywhere; }
+.prof-name p { margin: 2px 0 0; font-size: 15px; color: var(--ink-soft); font-weight: 700; }
+/* Their own numbers as the big type. */
+.prof-stats { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.prof-stats .ps { display: grid; align-content: center; gap: 2px; padding: 12px 14px 10px; border: var(--line) solid var(--ink); border-radius: var(--r-md); background: var(--card); box-shadow: 0 3px 0 rgba(91, 44, 30, .18); }
+.prof-stats .num { font-size: 34px; font-weight: 800; line-height: 1; color: var(--ink); }
+.prof-stats .ps span:last-child { font-size: 14px; font-weight: 700; color: var(--ink-soft); }
+.prof-stats .ps:first-child { background: #FFE1D4; }
+/* Badges are buttons now: tap one to see how to get it. */
+.badge-btn { display: grid; justify-items: center; gap: 4px; width: 100%; min-height: 96px; padding: 4px 2px; border: 0; background: none; border-radius: var(--r-md); font: inherit; font-size: 13px; font-weight: 800; color: inherit; line-height: 1.15; }
+.badge-btn:active .badge-art { transform: translateY(2px); }
+.badge-grid li.locked .badge-btn { color: #A47766; }
+.prof-badges { grid-template-columns: repeat(4, 1fr); gap: 6px; }
+.prof-badges .badge-art { width: 58px; height: 58px; }
+.prof-badges .badge-art svg { width: 30px; height: 30px; }
+.prof-pets { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+.prof-pets li { display: grid; justify-items: center; gap: 0; padding: 6px 4px 8px; border: var(--line) solid var(--ink); border-radius: var(--r-md); background: var(--card); text-align: center; }
+.prof-pets img { width: 84px; height: 84px; object-fit: contain; }
+.prof-pets .pn { font-weight: 800; font-size: 15px; line-height: 1.1; }
+.prof-pets .pt { font-size: 12px; font-weight: 800; color: var(--ink-soft); }
+.prof-pets li.gold { background: #FFF4CF; border-color: #B8860B; box-shadow: 0 0 0 3px #FFE08A; }
+/* Badge card (sheet) */
+.badge-card { display: grid; justify-items: center; gap: 4px; }
+.badge-card .bd-art .badge-art { width: 96px; height: 96px; }
+.badge-card .bd-art .badge-art svg { width: 50px; height: 50px; }
+.badge-card.locked .bd-art .badge-art { --bg: #F3E2DA !important; border-style: dashed; border-color: #C99A86; }
+.badge-card.locked .bd-art svg { opacity: .4; filter: grayscale(1); }
+.bd-how { font-size: 17px; line-height: 1.4; max-width: 30ch; }
+.bd-status { font-weight: 800; color: var(--ink-soft); }
+.bd-status.got { color: var(--mint-deep); font-size: 18px; }
+.badge-card .bar { width: 80%; }
+.bd-num { font-weight: 800; font-size: 15px; }
+/* Ranks: tap a classmate to see their profile. */
+.rank-row { position: relative; }
+.rank-hit { position: absolute; inset: 0; border: 0; background: none; border-radius: 14px; }
+.rank-hit:active { background: rgba(91, 44, 30, .06); }
+
+/* Kid dry view (17 Nov): in the Shop the look stays in view; only the items scroll under it. */
+#screen-shop { overflow: hidden; padding-bottom: 0; }
+#screen-shop .dress-stage { height: clamp(170px, 25vh, 240px); }
+.shop-scroll { flex: 1 1 auto; min-height: 0; overflow-y: auto; scrollbar-width: none; margin: -4px -16px 0; padding: 4px 16px 104px; display: grid; align-content: start; gap: 12px; }
+.shop-scroll::-webkit-scrollbar { display: none; }
+/* Home: cards fade out under Start walk instead of looking cut in half; the picture is a little shorter. */
+body[data-view="home"] .dock::before { content: ''; position: absolute; left: 0; right: 0; top: -36px; bottom: 0; z-index: -1; pointer-events: none;
+  background: linear-gradient(to bottom, rgba(255, 230, 218, 0), rgba(255, 230, 218, .92) 40px); }
+#screen-home .stage { height: clamp(200px, 28vh, 300px); }
+.dock { z-index: 5; }
+
+/* Walk screen: your avatar and buddy walk in the big card. */
+.walk-scene { position: relative; flex: 1 1 150px; min-height: 150px; max-height: 240px; margin: -16px -16px 0; border-radius: calc(var(--r-lg) - 3px) calc(var(--r-lg) - 3px) 0 0; background: var(--sky); border-bottom: 2px dashed #E3B9A6; overflow: hidden; }
+/* Permissions slide at the end of the walkthrough. */
+.perm-card { text-align: left; }
+.perm-card h2, .perm-card > p { text-align: center; }
+.perm-list { list-style: none; margin: 4px 0; padding: 0; display: grid; gap: 8px; width: 100%; }
+.perm { display: grid; grid-template-columns: 40px 1fr auto; align-items: center; gap: 10px; padding: 8px 10px; border: 2px solid var(--ink); border-radius: var(--r-md); background: var(--card-soft); }
+.perm-ico svg { width: 30px; height: 30px; display: block; color: var(--berry); }
+.perm-txt { display: grid; line-height: 1.2; }
+.perm-txt strong { font-size: 17px; }
+.perm-txt span { font-size: 14px; color: var(--ink-soft); }
+.perm .btn-soft { min-width: 84px; }
+.perm.on { background: #DFF6E8; }
+.perm.on .btn-soft { background: var(--mint); }
+.perm.off .btn-soft { opacity: .8; }
+#screen-me[data-who="me"] #meBack { display: none; }

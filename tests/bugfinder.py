@@ -546,6 +546,13 @@ class Finder:
         self.page.locator("#introName").fill("Ace", timeout=1000)
         if not self.selector_tap('#intro button[type="submit"]', "intro", "explore"):
             raise RuntimeError("Nickname submit was unavailable")
+        # Last slide: permissions (steps, safe zone, alerts). Tap each Allow, then Let's go!
+        self.pause(400)
+        if self.page.locator("#intro .perm-card").count():
+            for i in range(self.page.locator("#intro [data-ask]").count()):
+                self.selector_tap(f'#intro .perm:nth-child({i + 1}) [data-ask]', "intro", "explore")
+            if not self.selector_tap('#intro [data-act="done"]', "intro", "explore"):
+                raise RuntimeError("Permissions slide had no Let's go! button")
         if self.inspect("home", "nickname submitted")["intro"]:
             self.page.keyboard.press("Escape")
             self.pause(300)

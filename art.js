@@ -71,7 +71,10 @@ export const ICONS = {
   shop: icon('<path d="M9 4 4 8l3 4 2-1v13h10V11l2 1 3-4-5-4c-1 2-3 3-5 3s-4-1-5-3z"/>'),
   quests: icon('<path d="M14 3.5l3 6.3 6.8.8-5 4.7 1.3 6.8L14 18.8l-6.1 3.3 1.3-6.8-5-4.7 6.8-.8z"/>'),
   ranks: icon('<path d="M9 4h10v6a5 5 0 0 1-10 0z"/><path d="M9 6H5a4 4 0 0 0 4 5M19 6h4a4 4 0 0 1-4 5"/><path d="M14 15v4M10 24h8M11 24c0-3 1-5 3-5s3 2 3 5"/>'),
-  feet: icon('<path d="M9 4c2 0 3 2.5 3 5.5S11 15 9 15s-3-2.5-3-5.5S7 4 9 4z"/><path d="M7 18.5h4"/><path d="M19 9c2 0 3 2.5 3 5.5S21 20 19 20s-3-2.5-3-5.5S17 9 19 9z"/><path d="M17 23.5h4"/>'),
+  // Two footprints (big front pad + small heel), filled so they read as steps, not '0_0' (kid dry view, 17 Nov).
+  feet: icon('<g fill="currentColor" stroke="none"><ellipse cx="8.6" cy="11" rx="3.5" ry="5" transform="rotate(-12 8.6 11)"/><ellipse cx="7.6" cy="20.6" rx="2.5" ry="2.8"/><ellipse cx="19.6" cy="6.6" rx="3.5" ry="5" transform="rotate(12 19.6 6.6)"/><ellipse cx="20.6" cy="16.2" rx="2.5" ry="2.8"/></g>'),
+  me: icon('<circle cx="14" cy="9.5" r="4.5"/><path d="M5.5 24c.8-5 4.2-7.5 8.5-7.5s7.7 2.5 8.5 7.5"/>'),
+  crown: icon('<path d="M5 21h18M6 18 4.5 8.5l5.5 4.5L14 6l4 7 5.5-4.5L22 18z"/>'),
   chevron: icon('<path d="M11 7l7 7-7 7"/>'),
   clock: icon('<circle cx="14" cy="15" r="9"/><path d="M14 10v5l3 2"/><path d="M11 3h6"/>'),
   back: icon('<path d="M17 7l-7 7 7 7"/>'),

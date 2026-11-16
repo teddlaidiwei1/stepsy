@@ -15,6 +15,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;700;800&display=swap">
 <link rel="stylesheet" href="styles.css">
+<link rel="stylesheet" href="gold.css">
 <script type="importmap">
 { "imports": {
   "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
@@ -110,8 +111,10 @@
       </div>
     </section>
     <div class="seg" id="shopTabs" role="tablist" aria-label="Shop sections"></div>
-    <div class="item-grid" id="shopGrid"></div>
-    <p class="fine">Coins come from walking and quests. No real money, ever.</p>
+    <div class="shop-scroll">
+      <div class="item-grid" id="shopGrid"></div>
+      <p class="fine">Coins come from walking and quests. No real money, ever.</p>
+    </div>
   </main>
 
   <!-- QUESTS -->
@@ -144,8 +147,8 @@
     </div>
     <section class="rank-hero sticker" id="rankHero" aria-live="polite"></section>
     <section class="award sticker" aria-labelledby="awardTitle">
-      <h2 id="awardTitle">Half-year awards</h2>
-      <p>Every June and November, the best walkers in each class and school win a certificate and a badge.</p>
+      <h2 id="awardTitle">Prizes</h2>
+      <p>At the end of each term, the top walkers in each class and school win a prize and a badge.</p>
     </section>
     <section aria-labelledby="rankUnit">
       <div class="row section-head"><h2 id="rankUnit">Steps this week</h2><span class="muted">Demo names</span></div>
@@ -154,36 +157,51 @@
     <p class="fine">Only nickname, avatar and steps are ever shown.</p>
   </main>
 
-  <!-- ME (profile + friends) -->
-  <main class="screen" id="screen-me" data-screen="me" hidden>
-    <div class="sub-head"><button class="back chip" id="meBack" type="button"><span data-icon="back"></span>Back</button><h2>Me</h2><button class="chip" id="soundBtn" type="button" aria-pressed="true">Sound: on</button></div>
-    <section class="me-card sticker" aria-labelledby="meName">
-      <img class="me-av" id="meAvatar" alt="Your avatar">
-      <div class="me-info">
+  <!-- PROFILE: yours, or a friend's / classmate's (same page) -->
+  <main class="screen" id="screen-me" data-screen="me" data-who="me" hidden>
+    <div class="sub-head"><button class="back chip" id="meBack" type="button"><span data-icon="back"></span>Back</button><h2 id="profTitle">Me</h2><button class="chip own-only" id="soundBtn" type="button" aria-pressed="true">Sound: on</button></div>
+    <section class="prof-hero sticker" aria-labelledby="meName">
+      <div class="prof-stage" role="img" aria-label="Avatar and buddy"><div class="canvas" id="profStage"></div></div>
+      <div class="prof-name">
         <h2 id="meName">Wei Jie</h2>
-        <p class="muted" id="meSub"></p>
-        <div class="me-stats" id="meStats"></div>
+        <p id="meSub"></p>
       </div>
     </section>
+    <div class="prof-stats" id="meStats"></div>
     <section aria-labelledby="meBadgeTitle">
-      <div class="row section-head"><h2 id="meBadgeTitle">My badges</h2></div>
-      <ul class="badge-row" id="meBadges"></ul>
+      <div class="row section-head"><h2 id="meBadgeTitle">Badges</h2><span class="muted" id="meBadgeCount"></span></div>
+      <ul class="badge-grid prof-badges" id="meBadges"></ul>
+      <p class="fine">Tap a badge to see how to get it.</p>
     </section>
-    <section aria-labelledby="cheerTitle">
+    <section aria-labelledby="mePetTitle">
+      <div class="row section-head"><h2 id="mePetTitle">Animals</h2><span class="muted" id="mePetCount"></span></div>
+      <ul class="prof-pets" id="mePets"></ul>
+    </section>
+    <section class="friend-only" aria-labelledby="sendCheerTitle">
+      <div class="row section-head"><h2 id="sendCheerTitle">Send a cheer</h2></div>
+      <div class="cheers" id="profCheers"></div>
+      <p class="fine" id="profNote"></p>
+    </section>
+    <section class="own-only" aria-labelledby="cheerTitle">
       <div class="row section-head"><h2 id="cheerTitle">Cheers for you</h2></div>
       <ul class="cheer-list sticker" id="cheersIn"></ul>
     </section>
-    <section aria-labelledby="friendTitle">
+    <section class="own-only" aria-labelledby="friendTitle">
       <div class="row section-head"><h2 id="friendTitle">Friends <span class="muted" id="friendCount"></span></h2><button class="chip" id="addFriend" type="button">Add friend</button></div>
       <div class="friend-grid" id="friendGrid"></div>
       <p class="fine">Friends are added in person by QR code. No chat, only cheers.</p>
     </section>
-    <section class="parent-card sticker" aria-labelledby="parentTitle">
+    <section class="parent-card sticker own-only" aria-labelledby="alertsTitle">
+      <span class="pc-ico" data-icon="bell"></span>
+      <span><strong id="alertsTitle">Phone alerts</strong><span class="muted small" id="alertsNote">A ping when your egg is ready or a friend cheers.</span></span>
+      <button class="btn-soft sm" id="alertsBtn" type="button">Turn on</button>
+    </section>
+    <section class="parent-card sticker own-only" aria-labelledby="parentTitle">
       <span class="pc-ico" data-icon="shield"></span>
       <span><strong id="parentTitle">For parents</strong><span class="muted small">In the real app this is on the parent's own phone.</span></span>
       <button class="btn-soft sm" id="openParent" type="button">Parent view</button>
     </section>
-    <section class="demo-card sticker" aria-labelledby="demoTitle">
+    <section class="demo-card sticker own-only" aria-labelledby="demoTitle">
       <span><strong id="demoTitle">Demo mode</strong><span class="muted small" id="demoNote">For showing the app. Your own progress is kept safe.</span></span>
       <button class="btn-soft sm" id="demoBtn" type="button" aria-pressed="false">Turn on</button>
     </section>
@@ -225,6 +243,7 @@
       <button class="tab" type="button" data-tab="shop"><span class="ti" data-icon="shop"></span>Shop</button>
       <button class="tab" type="button" data-tab="quests"><span class="ti" data-icon="quests"></span>Quests</button>
       <button class="tab" type="button" data-tab="ranks"><span class="ti" data-icon="ranks"></span>Ranks</button>
+      <button class="tab" type="button" data-tab="me"><span class="ti" data-icon="me"></span>Me</button>
     </nav>
   </div>
 
@@ -237,6 +256,7 @@
     <div class="alert" id="walkAlert" hidden></div>
 
     <div class="walk-main">
+      <div class="walk-scene" id="walkScene" aria-hidden="true"></div>
       <p class="walk-steps"><span class="num" id="wSteps">0</span><span class="unit">steps</span></p>
       <div class="walk-stats">
         <div><span class="num" id="wTime">0:00</span><span>time</span></div>

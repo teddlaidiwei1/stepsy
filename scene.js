@@ -49,7 +49,7 @@ function animatePet(pet, t, baseYaw, hop) {
 }
 
 // mode: 'home' (avatar + buddy), 'viewer' (one pet, Pets tab), 'dress' (avatar alone, Shop).
-export function createStage(container, { outfit = null, pet = null, mode = 'home', onReady } = {}) {
+export function createStage(container, { outfit = null, pet = null, gold = false, mode = 'home', onReady } = {}) {
   const viewer = mode === 'viewer', dress = mode === 'dress';
   const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
   renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
@@ -78,18 +78,18 @@ export function createStage(container, { outfit = null, pet = null, mode = 'home
   const PET_YAW = viewer ? 0.5 : -0.7;
   let petObj = null;
   const hop = { t: -1 };
-  function setPet(type) {
+  function setPet(type, { gold = false } = {}) {
     if (petObj) scene.remove(petObj);
     petObj = null;
     if (!type) return;
-    petObj = makePet(type);
+    petObj = makePet(type, { gold });
     if (viewer) { petObj.position.set(0, 0, 0); petObj.scale.setScalar(1.25); }
     else { petObj.position.set(1.05, 0, 0.15); petObj.scale.setScalar(0.88); }
     petObj.rotation.y = PET_YAW;
     scene.add(petObj);
     renderer.render(scene, camera);
   }
-  setPet(pet);
+  setPet(pet, { gold });
 
   // Avatar (Home and Shop)
   const AV_YAW = dress ? 0.35 : 0.32;
@@ -227,8 +227,8 @@ export function createStage(container, { outfit = null, pet = null, mode = 'home
 // One shared offscreen renderer for pet portraits (cards, hatch reveal).
 let portraitRenderer = null;
 const portraitCache = new Map();
-export function petPortrait(type, size = 256) {
-  const key = `${type}@${size}`;
+export function petPortrait(type, size = 256, { gold = false } = {}) {
+  const key = `${type}@${size}:${gold ? 'gold' : 'plain'}`;
   if (portraitCache.has(key)) return portraitCache.get(key);
   try {
     if (!portraitRenderer) {
@@ -240,7 +240,7 @@ export function petPortrait(type, size = 256) {
     r.setSize(size, size);
     const s = new THREE.Scene();
     addLights(s);
-    const p = makePet(type);
+    const p = makePet(type, { gold });
     p.rotation.y = 0.55;
     s.add(p);
     const b = new THREE.Box3().setFromObject(p);
