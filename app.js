@@ -173,9 +173,11 @@ function renderGoal() {
   bar.setAttribute('aria-valuetext', `${fmt(state.steps)} of ${fmt(state.goal)} steps`);
   $('goalNum').textContent = fmt(state.goal);
   const left = PER_FRUIT - (state.steps % PER_FRUIT);
+  // Coins drop straight into your coins at every 1,000 steps (no claiming); the ticked coins are the ones you got.
+  const got = done * FRUIT_COINS;
   $('goalCaption').textContent = done >= total
-    ? "Goal done! Great walking today."
-    : `${fmt(left)} steps to your next +${FRUIT_COINS} coins.`;
+    ? `Goal done! You got all ${fmt(got)} coins today.`
+    : `${got ? `Got ${fmt(got)} coins. ` : ''}${fmt(left)} more steps for +${FRUIT_COINS}.`;
 }
 function countUp(el, from, to, done) {
   if (reduceMotion) { el.textContent = fmt(to); done?.(); return; }
