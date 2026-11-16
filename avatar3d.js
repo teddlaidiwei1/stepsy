@@ -15,11 +15,15 @@ export function loadGLB(file) {
 
 export const DEFAULT_OUTFIT = { look: 'male-a', hat: null, eyes: null, hold: null, chair: null, hearing: false };
 export const AVATAR_HEIGHT = 1.55;
-// Where a held thing sits in the right arm bone's space (the hand end of the arm), tuned by eye.
-const HOLD_FIT = { pos: [-0.16, 0, -0.13], rot: [0, -Math.PI / 2, 0], scale: 1.3 };
-const HOLD_POS = {
-  football: [-0.2, -0.12, -0.17], teddy: [-0.2, -0.08, -0.16], bottle: [-0.17, -0.02, -0.13],
-};
+// The fist, measured from the models: the centre of the hand end of the right arm, in the arm bone's own space.
+// In the 'holding-right' pose the arm bone is turned 60 degrees, so the grip is turned back to face the front.
+const HAND = { pos: [-0.255, 0, 0.07], rot: [0, -Math.PI / 3, 0] };
+const HOLD_SCALE = 1.3;
+// Small nudges from the fist for things that are held by the side, not by a stick (x right, y up, z front).
+const HOLD_NUDGE = { football: [-0.04, -0.14, 0.06], teddy: [0, -0.06, 0.08], bottle: [0, -0.1, 0.02] };
+// Things on a stick lean out to the side so they never cover the face.
+const HOLD_TILT = { lollipop: 0.5, pinwheel: 0.5, racket: 0.5, bubbles: 0.45, balloon: 0.2 };
+const HOLD_SIZE = { football: 0.8 };
 
 const mat = (color, rough = 0.6) => new THREE.MeshStandardMaterial({ color, roughness: rough, metalness: 0 });
 const put = (parent, mesh, x, y, z, rx = 0, ry = 0, rz = 0) => {
@@ -342,11 +346,15 @@ export async function buildAvatar(outfit = DEFAULT_OUTFIT) {
     const thing = makeHold(o.hold);
     if (arm && thing) {
       const unit = head ? measureHead(model, head).width : 0.45;
-      thing.scale.setScalar(unit * HOLD_FIT.scale);
-      thing.position.set(...(HOLD_POS[o.hold] || HOLD_FIT.pos));
-      thing.rotation.set(...HOLD_FIT.rot);
-      thing.name = 'hold';
-      arm.add(thing);
+      const grip = new THREE.Group();
+      grip.position.set(...HAND.pos);
+      grip.rotation.set(...HAND.rot);
+      grip.name = 'hold';
+      thing.scale.setScalar(unit * HOLD_SCALE * (HOLD_SIZE[o.hold] || 1));
+      thing.position.set(...(HOLD_NUDGE[o.hold] || [0, 0, 0]));
+      thing.rotation.z = HOLD_TILT[o.hold] || 0;
+      grip.add(thing);
+      arm.add(grip);
     }
   }
   let sitting = false;

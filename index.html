@@ -103,6 +103,7 @@
 
   <!-- SHOP -->
   <main class="screen" id="screen-shop" data-screen="shop" hidden>
+    <div class="shop-head">
     <section class="dressing sticker" aria-labelledby="tryName">
       <div class="dress-stage"><div class="canvas" id="dressStage"></div><p class="hint">Drag to turn</p></div>
       <div class="dress-bar">
@@ -111,6 +112,7 @@
       </div>
     </section>
     <div class="seg" id="shopTabs" role="tablist" aria-label="Shop sections"></div>
+    </div>
     <div class="shop-scroll">
       <div class="item-grid" id="shopGrid"></div>
       <p class="fine">Coins come from walking and quests. No real money, ever.</p>
@@ -188,8 +190,9 @@
     </section>
     <section class="own-only" aria-labelledby="friendTitle">
       <div class="row section-head"><h2 id="friendTitle">Friends <span class="muted" id="friendCount"></span></h2><button class="chip" id="addFriend" type="button">Add friend</button></div>
+      <ul class="req-list sticker" id="friendReqs" hidden></ul>
       <div class="friend-grid" id="friendGrid"></div>
-      <p class="fine">Friends are added in person by QR code. No chat, only cheers.</p>
+      <p class="fine">Your friend taps Accept before you become friends. No chat, only cheers.</p>
     </section>
     <section class="parent-card sticker own-only" aria-labelledby="alertsTitle">
       <span class="pc-ico" data-icon="bell"></span>

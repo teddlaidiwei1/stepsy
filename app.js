@@ -99,7 +99,7 @@ function addXp(n) {
     const p = $('profile'); p.classList.remove('lvpop'); void p.offsetWidth; p.classList.add('lvpop');
   }, 500);
 }
-function save() { try { localStorage.setItem('stepsy', JSON.stringify(state)); } catch {} }
+function save() { try { localStorage.setItem('stepsy', JSON.stringify(state)); } catch {} document.dispatchEvent(new Event('stepsy-saved')); }
 const uid = () => Math.random().toString(36).slice(2, 9);
 const eggGoal = (egg) => RARITY[egg.rarity].km;
 const eggReady = (egg) => egg.km >= eggGoal(egg);
@@ -476,6 +476,7 @@ function showScreen(name) {
   if (name === 'me') { renderMe(); renderAlertsBtn(); }
   if (name === 'parent') renderParent();
   $(`screen-${name}`).scrollTop = 0;
+  window.scrollTo(0, 0); // the page itself scrolls now (lets Safari shrink its address bar)
   updateDots();
 }
 document.querySelectorAll('.tab').forEach((tab) => tab.addEventListener('click', () => showScreen(tab.dataset.tab)));

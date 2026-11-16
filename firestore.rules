@@ -1,0 +1,67 @@
+rules_version = '2';
+// Stepsy real friends. Kids can only see players who are their friends, can only change their own profile,
+// only become friends when the other kid taps Accept, and can only send the fixed cheers (no chat).
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function signedIn() { return request.auth != null; }
+    function isFriend(owner) {
+      return exists(/databases/$(database)/documents/players/$(owner)/friends/$(request.auth.uid));
+    }
+    function shortStr(v, n) { return v is string && v.size() <= n; }
+
+    // Friend codes: look one up only by its exact code (no listing), claim a free one once, never change it.
+    match /codes/{code} {
+      allow get: if signedIn();
+      allow list: if false;
+      allow create: if signedIn() && code.matches('^[A-HJ-NP-Z2-9]{3}-[A-HJ-NP-Z2-9]{3}$')
+        && request.resource.data.keys().hasOnly(['uid']) && request.resource.data.uid == request.auth.uid;
+      allow update, delete: if false;
+    }
+
+    match /players/{uid} {
+      // You and your friends can read your profile. Nobody can list all players.
+      allow get: if signedIn() && (request.auth.uid == uid || isFriend(uid));
+      allow list: if false;
+      allow create, update: if signedIn() && request.auth.uid == uid
+        && request.resource.data.keys().hasOnly(['code', 'name', 'outfit', 'buddy', 'pets', 'gold', 'badges', 'today', 'day', 'streak', 'level', 'updated'])
+        && shortStr(request.resource.data.name, 16)
+        && exists(/databases/$(database)/documents/codes/$(request.resource.data.code))
+        && get(/databases/$(database)/documents/codes/$(request.resource.data.code)).data.uid == uid
+        && request.resource.data.today is int && request.resource.data.today >= 0 && request.resource.data.today < 200000
+        && request.resource.data.pets is list && request.resource.data.pets.size() <= 30
+        && request.resource.data.badges is list && request.resource.data.badges.size() <= 20;
+      allow delete: if false;
+
+      // Friend requests: sent to someone whose code you have. One per person (the request's ID is the sender),
+      // and only the person who got it can see it, accept it or say no.
+      match /requests/{fromUid} {
+        allow read, delete: if signedIn() && request.auth.uid == uid;
+        allow create: if signedIn() && request.auth.uid == fromUid && fromUid != uid
+          && request.resource.data.keys().hasOnly(['from', 'at'])
+          && shortStr(request.resource.data.from, 16) && request.resource.data.at == request.time;
+        allow update: if false;
+      }
+
+      // Friends: only made when someone taps Accept on a request. The person accepting writes both sides.
+      match /friends/{fid} {
+        allow read: if signedIn() && request.auth.uid == uid;
+        allow create: if signedIn() && uid != fid
+          && request.resource.data.keys().hasOnly(['at', 'by']) && request.resource.data.by == request.auth.uid
+          && ((request.auth.uid == uid && exists(/databases/$(database)/documents/players/$(uid)/requests/$(fid)))
+            || (request.auth.uid == fid && exists(/databases/$(database)/documents/players/$(fid)/requests/$(uid))));
+        allow update: if false;
+        allow delete: if signedIn() && request.auth.uid == uid;
+      }
+
+      // Cheers: only friends can send, only the fixed cheer words, only you can read yours.
+      match /cheers/{cid} {
+        allow read, delete: if signedIn() && request.auth.uid == uid;
+        allow create: if signedIn() && isFriend(uid)
+          && request.resource.data.keys().hasOnly(['from', 'fromUid', 'text', 'at'])
+          && request.resource.data.fromUid == request.auth.uid && shortStr(request.resource.data.from, 16)
+          && request.resource.data.text in ['Nice walk!', "Let's walk together!", 'Every step counts!', 'Cute pet!', 'You can do it!', 'High five!'];
+        allow update: if false;
+      }
+    }
+  }
+}

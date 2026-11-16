@@ -615,6 +615,13 @@ body.walking .dock { visibility: hidden; }
 .cheer-list { list-style: none; margin: 0; padding: 6px 14px; border-radius: var(--r-md); }
 .cheer-list li { padding: 7px 0 5px; font-size: 15px; }
 .cheer-list li + li { border-top: 2px dashed #EBCFC2; }
+.req-list { list-style: none; margin: 0 0 10px; padding: 6px 14px; border-radius: var(--r-md); }
+.req-list li { display: flex; align-items: center; gap: 8px; padding: 8px 0; font-size: 15px; }
+.req-list li + li { border-top: 2px dashed #EBCFC2; }
+.req-list .rq-name { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+.req-list .chip { min-height: 44px; }
+.add-friend .friend-alt { display: flex; justify-content: center; flex-wrap: wrap; gap: 8px; margin: 4px 0 8px; }
+.add-friend .friend-alt button { min-height: 48px; }
 .friend-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; }
 .friend-card { position: relative; border-radius: var(--r-md); padding: 10px 8px 10px; display: grid; justify-items: center; gap: 2px; text-align: center; }
 .fav { width: 64px; height: 64px; border-radius: 50%; border: 2px solid var(--ink); background: var(--sky); overflow: hidden; }
@@ -781,10 +788,22 @@ body:not(.demo) .demo-only { display: none !important; }
 /* Kid dry view (17 Nov): in the Shop the look stays in view; only the items scroll under it. */
 #screen-shop { overflow: hidden; padding-bottom: 0; }
 #screen-shop .dress-stage { height: clamp(170px, 25vh, 240px); }
+/* Tedd (17 Nov): the item list was too short to scroll on a real iPhone. The look now sits beside its name and
+   button (one short row instead of two tall ones), so the list gets about twice the room. */
+#screen-shop .dressing { flex: none; display: grid; grid-template-columns: 54% 1fr; }
+#screen-shop .dress-stage { height: clamp(150px, 23svh, 210px); border-bottom: 0; border-right: var(--line) solid var(--ink); }
+#screen-shop .dress-bar { flex-direction: column; align-items: stretch; justify-content: center; gap: 10px; padding: 12px; min-height: 0; }
+#screen-shop .dress-info strong { font-size: 18px; }
+#screen-shop .dress-bar .btn-main, #screen-shop .dress-bar .btn-soft { justify-content: center; padding-left: 10px; padding-right: 10px; }
+#screen-shop #shopTabs { flex: none; }
+/* Short screens (Safari with its bars): smaller pictures on the other screens too, so there's more to scroll. */
+@media (max-height: 720px) {
+  #screen-home .stage { height: clamp(170px, 26svh, 220px); }
+}
 .shop-scroll { flex: 1 1 auto; min-height: 0; overflow-y: auto; scrollbar-width: none; margin: -4px -16px 0; padding: 4px 16px 104px; display: grid; align-content: start; gap: 12px; }
 .shop-scroll::-webkit-scrollbar { display: none; }
 /* Home: cards fade out under Start walk instead of looking cut in half; the picture is a little shorter. */
-body[data-view="home"] .dock::before { content: ''; position: absolute; left: 0; right: 0; top: -36px; bottom: 0; z-index: -1; pointer-events: none;
+.dock::before { content: ''; position: absolute; left: 0; right: 0; top: -36px; bottom: 0; z-index: -1; pointer-events: none;
   background: linear-gradient(to bottom, rgba(255, 230, 218, 0), rgba(255, 230, 218, .92) 40px); }
 #screen-home .stage { height: clamp(200px, 28vh, 300px); }
 .dock { z-index: 5; }
@@ -805,3 +824,30 @@ body[data-view="home"] .dock::before { content: ''; position: absolute; left: 0;
 .perm.on .btn-soft { background: var(--mint); }
 .perm.off .btn-soft { opacity: .8; }
 #screen-me[data-who="me"] #meBack { display: none; }
+
+/* Tedd (17 Nov): on iPhone Safari the address bar only shrinks when the PAGE itself scrolls, not a box inside it.
+   So the page scrolls now. Start walk + the tabs stay pinned to the bottom of the screen, and in the Shop the
+   look and its tabs stay stuck at the top while the items scroll under them. */
+html, body { height: auto; min-height: 100%; }
+.app { height: auto; min-height: 100%; }
+.screen { flex: none; min-height: 0; overflow: visible; }
+.dock { position: fixed; left: 0; right: 0; margin: 0 auto; max-width: 430px; }
+#screen-shop { overflow: visible; padding-bottom: 164px; }
+.shop-head { position: sticky; top: 0; z-index: 3; display: grid; gap: 12px;
+  margin: -2px calc(-1 * max(16px, env(safe-area-inset-right, 0px))) 0; padding: calc(env(safe-area-inset-top, 0px) + 6px) max(16px, env(safe-area-inset-right, 0px)) 10px;
+  background: var(--ground); }
+.shop-head::after { content: ''; position: absolute; left: 0; right: 0; top: 100%; height: 18px; pointer-events: none;
+  background: linear-gradient(var(--ground), rgba(255, 230, 218, 0)); }
+.shop-scroll { flex: none; overflow: visible; margin: 0; padding: 4px 0 0; }
+/* While a pop-up, a walk or the intro is open, the page behind stays still. */
+body:has(#scrim:not([hidden])), body.walking, body:has(#intro:not([hidden])) { overflow: hidden; }
+.sheet, .walk, .intro { overscroll-behavior: contain; }
+/* Typing a friend's code: big, clear box (16px+ so iPhone Safari doesn't zoom in). */
+.code-form { display: grid; gap: 6px; width: 100%; margin: 4px 0 2px; }
+.code-form label { font-weight: 800; }
+.code-row { display: flex; gap: 8px; justify-content: center; }
+.code-row input { width: 9.5ch; min-width: 0; flex: 0 1 auto; min-height: 52px; padding: 4px 12px 0; font: inherit; font-size: 24px; font-weight: 800;
+  letter-spacing: .08em; text-align: center; text-transform: uppercase; color: var(--ink); background: var(--card);
+  border: var(--line) solid var(--ink); border-radius: 16px; }
+.code-row input::placeholder { color: #C9A799; }
+.code-row input:focus-visible { outline: 3px solid var(--berry); outline-offset: 2px; }

@@ -5,6 +5,9 @@ import { petPortrait, createStage } from './scene.js';
 import { PETS, PET_ORDER } from './pets.js';
 import { BADGES, FRIENDS, NEW_FRIEND, CHEERS, CHEERS_IN, ME, classBoard, schoolBoard, sgBoard, seeded, HOME_SPOT, DEMO_PATH, DANGER_SPOTS } from './data.js';
 import { earnedBadges, badgeButtons, wireBadges } from './quests.js';
+import * as online from './online.js';
+import { scanQR, canScan } from './scan.js';
+import { notify } from './notify.js';
 
 let ctx;
 let board = 'class';
@@ -44,6 +47,9 @@ export function initSocial(c) {
     renderRanks();
   });
   $('addFriend').addEventListener('click', openAddFriend);
+  takeLinkCode();
+  startOnline();
+  if (ctx.state.demo) linkAdd();
   $('openParent').addEventListener('click', () => ctx.gate(() => ctx.showScreen('parent')));
   $('demoBtn').addEventListener('click', () => ctx.gate(() => ctx.setDemo(!ctx.state.demo)));
   const snd = $('soundBtn');
@@ -144,7 +150,7 @@ export function renderMe() {
   const name = who ? who.name : state.nickname;
   $('profTitle').textContent = who ? (who.friend ? 'Friend' : 'Classmate') : 'Me';
   $('meName').textContent = name;
-  $('meSub').textContent = who ? `Class ${who.cls}${who.friend ? ' · Your friend' : ''}`
+  $('meSub').textContent = who ? (who.cls ? `Class ${who.cls}${who.friend ? ' · Your friend' : ''}` : `Level ${who.level} · Your friend`)
     : state.demo ? `${ME.cls} · ${ME.school} (demo)` : 'Keep walking to level up!';
 
   // Big 3D picture: the avatar with their buddy (gold if they made it gold).
@@ -187,7 +193,13 @@ export function renderMe() {
     $('profCheers').innerHTML = who.friend ? CHEERS.map((c) => `<button class="chip" type="button">${esc(c)}</button>`).join('') : '';
     $('profNote').textContent = who.friend ? 'Friends can only send cheers. There is no chat.'
       : `You can add ${name} as a friend when you meet in person. Then you can send cheers.`;
-    $('profCheers').querySelectorAll('.chip').forEach((b) => b.addEventListener('click', () => {
+    $('profCheers').querySelectorAll('.chip').forEach((b) => b.addEventListener('click', async () => {
+      if (who.online) {
+        b.disabled = true;
+        try { await online.sendCheer(who.uid, b.textContent, state.nickname); }
+        catch { ctx.toast('Could not send. Check the internet and try again.'); b.disabled = false; return; }
+        b.disabled = false;
+      }
       sfx('cheer');
       ctx.toast(`Cheer sent to ${name}: "${b.textContent}"`);
     }));
@@ -197,11 +209,37 @@ export function renderMe() {
   $('demoBtn').textContent = state.demo ? 'Turn off' : 'Turn on';
   $('demoBtn').setAttribute('aria-pressed', String(!!state.demo));
   $('demoNote').textContent = state.demo ? 'Showing made-up demo data. Turn off to go back to your own progress.' : 'For showing the app. Your own progress is kept safe.';
-  $('cheersIn').innerHTML = !state.demo && !state.friends.length
-    ? '<li class="empty">No cheers yet. Add friends and they can cheer you on.</li>'
-    : CHEERS_IN.map((c) => `<li><strong>${esc(c.from)}</strong> sent "${esc(c.text)}" <span class="muted small">${esc(c.ago)}</span></li>`).join('');
+  const realCheers = online.cheerList();
+  $('cheersIn').innerHTML = state.demo
+    ? CHEERS_IN.map((c) => `<li><strong>${esc(c.from)}</strong> sent "${esc(c.text)}" <span class="muted small">${esc(c.ago)}</span></li>`).join('')
+    : realCheers.length
+      ? realCheers.map((c) => `<li><strong>${esc(c.from)}</strong> sent "${esc(c.text)}" <span class="muted small">${esc(ago(c.at))}</span></li>`).join('')
+      : '<li class="empty">No cheers yet. Add friends and they can cheer you on.</li>';
 
-  const friends = state.friends.map((id) => [...FRIENDS, NEW_FRIEND].find((f) => f.id === id)).filter(Boolean);
+  const friends = state.demo ? state.friends.map((id) => [...FRIENDS, NEW_FRIEND].find((f) => f.id === id)).filter(Boolean)
+    : online.friendList();
+  const reqs = state.demo ? [] : online.requestList();
+  const reqBox = $('friendReqs');
+  reqBox.hidden = !reqs.length;
+  reqBox.innerHTML = reqs.map((r) => `
+    <li><span class="rq-name"><strong>${esc(r.from)}</strong> wants to be your friend</span>
+      <button class="chip" type="button" data-no="${esc(r.uid)}">No</button>
+      <button class="chip btn-main" type="button" data-yes="${esc(r.uid)}">Accept</button></li>`).join('');
+  reqBox.querySelectorAll('button').forEach((b) => b.addEventListener('click', async () => {
+    const uid = b.dataset.yes || b.dataset.no;
+    const r = reqs.find((x) => x.uid === uid);
+    reqBox.querySelectorAll('button').forEach((x) => { x.disabled = true; });
+    try {
+      if (b.dataset.yes) {
+        await online.acceptRequest(uid);
+        sfx('cheer');
+        ctx.toast(`${r?.from || 'Your friend'} is your friend now!`);
+      } else {
+        await online.declineRequest(uid);
+      }
+    } catch { ctx.toast('Could not do that. Check the internet and try again.'); }
+    renderMe();
+  }));
   $('friendCount').textContent = `${friends.length}`;
   const grid = $('friendGrid');
   grid.innerHTML = friends.length ? '' : '<p class="empty">No friends yet. Tap Add friend when you are with a friend.</p>';
@@ -212,7 +250,7 @@ export function renderMe() {
     b.innerHTML = `
       <span class="fav"><img alt=""></span>
       <span class="fn">${esc(f.name)}</span>
-      <span class="fs muted small">${esc(f.cls)} · <span class="num">${fmt(f.today)}</span> steps</span>
+      <span class="fs muted small">${f.cls ? `${esc(f.cls)} · ` : ''}<span class="num">${fmt(f.today)}</span> steps</span>
       <img class="fpet" src="${petPortrait(f.buddy, 96, { gold: (f.gold || []).includes(f.buddy) })}" alt="">`;
     b.setAttribute('aria-label', `${f.name}, ${fmt(f.today)} steps today. See profile`);
     avatarPicture(f.outfit, { size: 128, head: true }).then((s) => { b.querySelector('.fav img').src = s; });
@@ -221,54 +259,263 @@ export function renderMe() {
   });
 }
 
+// ---------------- Real friends (online) ----------------
+function ago(ms) {
+  const m = Math.round((Date.now() - ms) / 60000);
+  if (m < 1) return 'just now';
+  if (m < 60) return `${m} min ago`;
+  const h = Math.round(m / 60);
+  return h < 24 ? `${h} h ago` : h < 48 ? 'Yesterday' : `${Math.round(h / 24)} days ago`;
+}
+const onMyPage = () => document.body.dataset.view === 'me' && !current;
+function startOnline() {
+  const { state } = ctx;
+  if (state.demo || !online.onlineAvailable()) return;
+  online.onChange(() => { if (onMyPage()) renderMe(); });
+  online.onNewCheer((c) => { sfx('cheer'); notify(`${c.from} cheered you!`, `"${c.text}"`, { toast: ctx.toast, tag: 'cheer' }); });
+  online.onNewRequest((r) => { sfx('cheer'); notify(`${r.from} wants to be your friend`, 'Open Me to say yes or no.', { toast: ctx.toast, tag: 'request' }); });
+  const go = () => { if (state.onboarded) online.start(state).catch(() => {}); };
+  go();
+  document.addEventListener('stepsy-saved', () => { go(); online.pushProfile(state); linkAdd(); });
+  linkAdd();
+}
+
+// ---------------- Add-friend link (…/stepsy/?add=ABC-123) ----------------
+// Your QR holds this link, so any phone camera can open it, and "Share my link" sends it in a message.
+const friendLink = (code) => `${location.origin}${location.pathname}?add=${code}`;
+function codeFromText(t) {
+  t = String(t || '').trim();
+  const m = /^stepsy-friend:([A-Za-z0-9-]{7})$/.exec(t);
+  if (m) return m[1].toUpperCase();
+  try { const c = (new URL(t).searchParams.get('add') || '').toUpperCase(); if (online.CODE_RE.test(c)) return c; } catch {}
+  return null;
+}
+// Opening a friend's link: remember the code (it survives the first-time setup), then ask before adding.
+function takeLinkCode() {
+  const p = new URLSearchParams(location.search);
+  if (!p.has('add')) return;
+  const c = String(p.get('add')).trim().toUpperCase();
+  p.delete('add');
+  history.replaceState(null, '', `${location.pathname}${p.size ? `?${p}` : ''}${location.hash}`);
+  try { if (online.CODE_RE.test(c)) localStorage.setItem('stepsy-add', c); } catch {}
+}
+function linkAdd() {
+  const { state, openSheet, closeSheet, toast } = ctx;
+  let code = null;
+  try { code = localStorage.getItem('stepsy-add'); } catch {}
+  if (!code || !state.onboarded || !online.onlineAvailable()) return;
+  try { localStorage.removeItem('stepsy-add'); } catch {}
+  if (state.demo) { toast('Turn off Demo mode to add real friends.'); return; }
+  setTimeout(() => {
+    const body = openSheet(`
+      <div class="add-friend">
+        <h2 id="sheetTitle">Send a friend request?</h2>
+        <p>Your friend's code is</p>
+        <p class="code num">${code}</p>
+        <p class="muted small" id="linkMsg">Only add people you know. No chat, only cheers.</p>
+        <div class="sheet-actions">
+          <button class="btn-soft" type="button" data-act="close">Not now</button>
+          <button class="btn-main" type="button" data-act="add">Send request</button>
+        </div>
+      </div>`);
+    body.querySelector('[data-act="close"]').addEventListener('click', closeSheet);
+    const add = body.querySelector('[data-act="add"]');
+    add.addEventListener('click', async () => {
+      add.disabled = true;
+      const msg = (t) => { const m = body.querySelector('#linkMsg'); if (m) m.textContent = t; };
+      msg('Sending...');
+      try {
+        await online.start(state);
+        const r = await online.sendRequest(code, state.nickname);
+        if (r.ok) { requestDone(body, r); return; }
+        msg(r.why === 'self' ? 'That is your own link!' : r.why === 'already' ? `${r.friend?.name || 'They'} is already your friend.`
+          : 'No one has that code. Ask your friend to send the link again.');
+      } catch { msg('Could not add. Check the internet and try again.'); add.disabled = false; }
+    });
+  }, 700);
+}
+
+async function shareLink(code) {
+  const url = friendLink(code);
+  if (navigator.share) {
+    try { await navigator.share({ title: 'Stepsy', text: `Be my Stepsy friend! My code is ${code}.`, url }); return; }
+    catch (e) { if (e?.name === 'AbortError') return; }
+  }
+  try { await navigator.clipboard.writeText(url); ctx.toast('Link copied! Send it to your friend.'); }
+  catch { ctx.toast(`Your link: ${url}`); }
+}
+
+async function drawQR(body, text) {
+  const box = body.querySelector('#qrBox');
+  try {
+    await lazy(QR_JS);
+    const qr = window.qrcode(0, 'M');
+    qr.addData(text);
+    qr.make();
+    if (box) box.innerHTML = qr.createSvgTag({ cellSize: 6, margin: 0, scalable: true });
+  } catch {
+    if (box) box.innerHTML = '<span class="muted small">QR needs internet</span>';
+  }
+}
+
 async function openAddFriend() {
-  const { openSheet, closeSheet, toast, state, esc } = ctx;
+  const { openSheet, closeSheet, state, esc } = ctx;
+  const real = !state.demo;
+  if (real && !online.onlineAvailable()) {
+    const body = openSheet(`
+      <div class="add-friend">
+        <h2 id="sheetTitle">Add a friend</h2>
+        <p>Real friends are coming soon. Turn on Demo mode (for grown-ups) to see how it works.</p>
+        <div class="sheet-actions"><button class="btn-main" type="button" data-act="close">OK</button></div>
+      </div>`);
+    body.querySelector('[data-act="close"]').addEventListener('click', closeSheet);
+    return;
+  }
   const body = openSheet(`
     <div class="add-friend">
       <h2 id="sheetTitle">Add a friend</h2>
-      <p>Show this to a friend <strong>in person</strong>. They scan it with their app.</p>
+      <p>Your friend scans this, or opens your link. Then you tap <strong>Accept</strong>.</p>
       <div class="qr" id="qrBox" aria-label="Your friend code as a QR code"><span class="muted small">Loading...</span></div>
-      <p class="code num">${esc(ME.code)}</p>
-      <p class="muted small">No strangers: you can only add people you meet. No chat, only cheers.</p>
+      <p class="code num" id="myCode">${real ? '...' : esc(ME.code)}</p>
+      <div class="friend-alt">
+        ${real ? '<button class="btn-soft" type="button" data-act="share" disabled>Share my link</button>' : ''}
+        <button class="btn-soft" type="button" data-act="type">Type a code</button>
+      </div>
+      <p class="muted small">Only add people you know. No chat, only cheers.</p>
       <div class="sheet-actions">
         <button class="btn-soft" type="button" data-act="close">Close</button>
         <button class="btn-main" type="button" data-act="scan">Scan a code</button>
       </div>
     </div>`);
   body.querySelector('[data-act="close"]').addEventListener('click', closeSheet);
-  body.querySelector('[data-act="scan"]').addEventListener('click', () => {
-    if (state.friends.includes(NEW_FRIEND.id)) { closeSheet(); toast(`${NEW_FRIEND.name} is already your friend`); return; }
-    body.innerHTML = `
-      <div class="add-friend">
-        <div class="scan-box" aria-hidden="true"><span></span></div>
-        <p>Scanning... (demo)</p>
-      </div>`;
-    setTimeout(() => {
-      state.friends.push(NEW_FRIEND.id);
-      ctx.save();
-      body.innerHTML = `
-        <div class="add-friend">
-          <img class="fs-av" alt="">
-          <h2 id="sheetTitle">${esc(NEW_FRIEND.name)} is your friend now!</h2>
-          <p class="muted">Class ${esc(NEW_FRIEND.cls)}. You can send each other cheers.</p>
-          <div class="sheet-actions"><button class="btn-main" type="button" data-act="close">Yay!</button></div>
-        </div>`;
-      avatarPicture(NEW_FRIEND.outfit, { size: 240 }).then((s) => { const i = body.querySelector('.fs-av'); if (i) i.src = s; });
-      body.querySelector('[data-act="close"]').addEventListener('click', closeSheet);
-      renderMe();
-    }, 1400);
-  });
+  body.querySelector('[data-act="scan"]').addEventListener('click', () => (real ? realScan(body) : demoScan(body)));
+  body.querySelector('[data-act="type"]').addEventListener('click', () => (real ? realScan(body, true) : demoScan(body)));
+  if (!real) { drawQR(body, `stepsy-friend:${ME.code}`); return; }
   try {
-    await lazy(QR_JS);
-    const qr = window.qrcode(0, 'M');
-    qr.addData(`stepsy-friend:${ME.code}`);
-    qr.make();
-    const box = body.querySelector('#qrBox');
-    if (box) box.innerHTML = qr.createSvgTag({ cellSize: 6, margin: 0, scalable: true });
+    await online.start(state);
+    const code = online.myCode();
+    const el = body.querySelector('#myCode');
+    if (el) el.textContent = code;
+    drawQR(body, friendLink(code));
+    const sh = body.querySelector('[data-act="share"]');
+    if (sh) { sh.disabled = false; sh.addEventListener('click', () => shareLink(code)); }
   } catch {
     const box = body.querySelector('#qrBox');
-    if (box) box.innerHTML = '<span class="muted small">QR needs internet</span>';
+    if (box) box.innerHTML = '<span class="muted small">Needs internet. Try again in a moment.</span>';
+    const el = body.querySelector('#myCode');
+    if (el) el.textContent = '';
   }
+}
+
+// Demo mode: a pretend scan that always finds Mei Ling.
+function demoScan(body) {
+  const { closeSheet, toast, state, esc } = ctx;
+  if (state.friends.includes(NEW_FRIEND.id)) { closeSheet(); toast(`${NEW_FRIEND.name} is already your friend`); return; }
+  body.innerHTML = `
+    <div class="add-friend">
+      <div class="scan-box" aria-hidden="true"><span></span></div>
+      <p>Scanning... (demo)</p>
+    </div>`;
+  setTimeout(() => {
+    state.friends.push(NEW_FRIEND.id);
+    ctx.save();
+    friendAdded(body, NEW_FRIEND.name, NEW_FRIEND.outfit, `Class ${esc(NEW_FRIEND.cls)}. You can send each other cheers.`);
+  }, 1400);
+}
+
+function friendAdded(body, name, outfit, line) {
+  const { closeSheet, esc } = ctx;
+  sfx('cheer');
+  body.innerHTML = `
+    <div class="add-friend">
+      <img class="fs-av" alt="">
+      <h2 id="sheetTitle">${esc(name)} is your friend now!</h2>
+      <p class="muted">${line}</p>
+      <div class="sheet-actions"><button class="btn-main" type="button" data-act="close">Yay!</button></div>
+    </div>`;
+  avatarPicture(outfit, { size: 240 }).then((s) => { const i = body.querySelector('.fs-av'); if (i) i.src = s; });
+  body.querySelector('[data-act="close"]').addEventListener('click', closeSheet);
+  renderMe();
+}
+
+// After sending a request: friends straight away if they had already asked you, otherwise wait for their Accept.
+function requestDone(body, r) {
+  if (r.friendNow) { friendAdded(body, r.friend.name, r.friend.outfit, 'You can send each other cheers.'); return; }
+  const { closeSheet } = ctx;
+  sfx('cheer');
+  body.innerHTML = `
+    <div class="add-friend">
+      <h2 id="sheetTitle">${r.again ? 'Request already sent' : 'Friend request sent!'}</h2>
+      <p>When your friend taps <strong>Accept</strong>, you become friends.</p>
+      <div class="sheet-actions"><button class="btn-main" type="button" data-act="close">OK</button></div>
+    </div>`;
+  body.querySelector('[data-act="close"]').addEventListener('click', closeSheet);
+}
+
+// Real scan: the camera looks for a friend's Stepsy QR code. Typing the code works too.
+function realScan(body, typeOnly = false) {
+  const { closeSheet, esc } = ctx;
+  body.innerHTML = `
+    <div class="add-friend">
+      <h2 id="sheetTitle">${typeOnly ? "Type your friend's code" : "Scan your friend's code"}</h2>
+      <div class="scan-box live" id="scanBox" aria-hidden="true"${typeOnly ? ' hidden' : ''}><span></span></div>
+      <p class="muted small" id="scanMsg">${typeOnly ? 'Codes look like ABC-123. It is under their QR code.' : "Point the camera at the QR code on your friend's phone."}</p>
+      <form class="code-form" id="codeForm" autocomplete="off">
+        <label for="codeIn" class="small">${typeOnly ? "Their code" : "Or type their code"}</label>
+        <div class="code-row">
+          <input id="codeIn" inputmode="text" autocapitalize="characters" spellcheck="false" maxlength="7" placeholder="ABC-123">
+          <button class="btn-main" type="submit">Send</button>
+        </div>
+      </form>
+      <div class="sheet-actions"><button class="btn-soft" type="button" data-act="close">Close</button></div>
+    </div>`;
+  let scanner = null;
+  const stopCam = () => scanner?.stop();
+  const msg = (t) => { const m = body.querySelector('#scanMsg'); if (m) m.textContent = t; };
+  body.querySelector('[data-act="close"]').addEventListener('click', () => { stopCam(); closeSheet(); });
+  const input = body.querySelector('#codeIn');
+  input.addEventListener('input', () => {
+    let v = input.value.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 6);
+    if (v.length > 3) v = `${v.slice(0, 3)}-${v.slice(3)}`;
+    input.value = v;
+  });
+  let busy = false;
+  const tryCode = async (code) => {
+    if (busy) return;
+    busy = true;
+    msg('Sending...');
+    try {
+      const r = await online.sendRequest(code, ctx.state.nickname);
+      if (r.ok) { stopCam(); requestDone(body, r); return; }
+      msg(r.why === 'self' ? 'That is your own code!' : r.why === 'already' ? `${r.friend?.name || 'They'} is already your friend.`
+        : r.why === 'bad' ? 'Codes look like ABC-123.' : 'No one has that code. Check it and try again.');
+    } catch {
+      msg('Could not send. Check the internet and try again.');
+    }
+    busy = false;
+  };
+  body.querySelector('#codeForm').addEventListener('submit', (e) => { e.preventDefault(); tryCode(input.value); });
+  if (typeOnly) { input.focus(); return; } // opened by the kid's own tap, so the keyboard can come up
+  if (!canScan()) { msg('This phone cannot use the camera here. Type the code instead.'); body.querySelector('#scanBox').hidden = true; return; }
+  const loop = () => {
+    if (!document.contains(input)) return; // pop-up already closed: don't turn the camera back on
+    scanner = scanQR(body.querySelector('#scanBox'));
+    scanner.promise.then(async (text) => {
+      const code = codeFromText(text);
+      if (!code) { msg('That is not a Stepsy code. Try again.'); setTimeout(loop, 1200); return; }
+      await tryCode(code);
+      if (body.querySelector('#scanBox')) setTimeout(loop, 1500);
+    }).catch((e) => {
+      if (e.message === 'stopped') return;
+      const box = body.querySelector('#scanBox'); if (box) box.hidden = true;
+      msg(e.message === 'denied' ? 'Camera is off for Stepsy. Type the code instead, or ask a grown-up to allow the camera.'
+        : 'No camera found. Type the code instead.');
+    });
+  };
+  loop();
+  // Make sure the camera turns off however the pop-up closes (scrim tap, Escape).
+  const obs = new MutationObserver(() => { if (!document.contains(input)) { stopCam(); obs.disconnect(); } });
+  obs.observe(document.body, { childList: true, subtree: true });
 }
 
 // ---------------- Parent view ----------------
