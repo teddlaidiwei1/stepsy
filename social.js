@@ -47,6 +47,8 @@ export function initSocial(c) {
     renderRanks();
   });
   $('addFriend').addEventListener('click', openAddFriend);
+  $('renameBtn').addEventListener('click', openRename);
+  $('unfriendBtn').addEventListener('click', () => { if (current?.friend) askUnfriend(current); });
   takeLinkCode();
   takeCoros();
   startOnline();
@@ -233,6 +235,7 @@ export function renderMe() {
     $('profCheers').innerHTML = who.friend ? CHEERS.map((c) => `<button class="chip" type="button">${esc(c)}</button>`).join('') : '';
     $('profNote').textContent = who.friend ? 'Friends can only send cheers. There is no chat.'
       : `You can add ${name} as a friend when you meet in person. Then you can send cheers.`;
+    $('unfriendBtn').hidden = !who.friend;
     if (who.friend) wireCheers(who, name);
     return;
   }
@@ -325,6 +328,68 @@ function wireCheers(who, name) {
   }));
 }
 
+// ---------------- Change your nickname ----------------
+function openRename() {
+  const { openSheet, closeSheet, state, esc, toast } = ctx;
+  const body = openSheet(`
+    <form class="add-friend" id="renameForm" autocomplete="off">
+      <h2 id="sheetTitle">Change your name</h2>
+      <p>Friends will see your new name. Pick a game name, not your real name.</p>
+      <div class="code-row name-row">
+        <input id="nameIn" type="text" maxlength="12" autocapitalize="words" enterkeyhint="done" spellcheck="false"
+          value="${esc(state.nickname)}" aria-labelledby="sheetTitle">
+      </div>
+      <p class="intro-err" id="nameErr" role="alert"></p>
+      <div class="sheet-actions">
+        <button class="btn-soft" type="button" data-act="close">Cancel</button>
+        <button class="btn-main" type="submit">Save</button>
+      </div>
+    </form>`);
+  body.querySelector('[data-act="close"]').addEventListener('click', closeSheet);
+  body.querySelector('#nameIn').addEventListener('input', () => { body.querySelector('#nameErr').textContent = ''; });
+  body.querySelector('form').addEventListener('submit', (e) => {
+    e.preventDefault();
+    const name = body.querySelector('#nameIn').value.replace(/\s+/g, ' ').trim();
+    if (name.length < 2) { body.querySelector('#nameErr').textContent = 'Type a name (2 letters or more).'; return; }
+    state.nickname = name;
+    ctx.save();
+    ctx.renderTop();
+    closeSheet();
+    renderMe();
+    toast(`Your name is now ${name}`);
+  });
+}
+
+// ---------------- Remove a friend (asks first; no native pop-ups) ----------------
+function askUnfriend(who) {
+  const { openSheet, closeSheet, esc, state, toast } = ctx;
+  const body = openSheet(`
+    <div class="add-friend">
+      <h2 id="sheetTitle">Remove ${esc(who.name)}?</h2>
+      <p>You will stop seeing each other's steps and cheers. You can add each other again later.</p>
+      <div class="sheet-actions">
+        <button class="btn-soft" type="button" data-act="close">Keep</button>
+        <button class="btn-main" type="button" data-act="remove">Remove</button>
+      </div>
+    </div>`);
+  body.querySelector('[data-act="close"]').addEventListener('click', closeSheet);
+  const btn = body.querySelector('[data-act="remove"]');
+  btn.addEventListener('click', async () => {
+    btn.disabled = true;
+    try {
+      if (who.online) await online.removeFriend(who.uid);
+      else { state.friends = state.friends.filter((id) => id !== who.id); ctx.save(); }
+    } catch {
+      btn.disabled = false;
+      toast('Could not remove. Check the internet and try again.');
+      return;
+    }
+    closeSheet();
+    toast(`${who.name} is no longer your friend`);
+    ctx.showScreen('me');
+  });
+}
+
 // ---------------- Real friends (online) ----------------
 function ago(ms) {
   const m = Math.round((Date.now() - ms) / 60000);
@@ -346,13 +411,27 @@ function startOnline() {
   const go = () => { if (state.onboarded) online.start(state).catch(() => {}); };
   go();
   document.addEventListener('stepsy-saved', () => { go(); online.pushProfile(state); linkAdd(); });
+  // Coming back to the app after the phone slept, or the internet coming back: reconnect so friends show again
+  // without a reload. If the first sign-in failed (weak signal), keep trying every 15 s.
+  let hiddenAt = 0;
+  const wakeUp = (force) => { go(); if (force || (hiddenAt && Date.now() - hiddenAt > 15000)) online.wake(); hiddenAt = 0; };
+  document.addEventListener('visibilitychange', () => { if (document.hidden) hiddenAt = Date.now(); else wakeUp(); });
+  window.addEventListener('pageshow', (e) => { if (e.persisted) wakeUp(true); });
+  window.addEventListener('online', () => wakeUp(true));
+  setInterval(() => { if (!online.myCode()) go(); }, 15000);
   linkAdd();
   corosImport();
 }
 
-// ---------------- Tedd's own COROS watch steps (one-time link …/stepsy/?coros=2026-11-16.18659_…) ----------------
-// Only the phone whose friend code is Tedd's takes it; on anyone else's phone the link does nothing.
-const COROS_CODE = 'GT5-9UD';
+// ---------------- Owner's own watch steps (one-time link …/stepsy/?coros=YYYY-MM-DD.steps_…) ----------------
+// Only the owner's phone takes it (its friend code matches this fingerprint); on anyone else's phone it does nothing.
+const COROS_HASH = '3176894684ef0266c53a30e9808e79fc503cb88843c91fd0c7ac5d4aac290fb1';
+async function isOwner(code) {
+  try {
+    const d = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(String(code || '')));
+    return [...new Uint8Array(d)].map((b) => b.toString(16).padStart(2, '0')).join('') === COROS_HASH;
+  } catch { return false; }
+}
 function takeCoros() {
   const p = new URLSearchParams(location.search);
   if (!p.has('coros')) return;
@@ -368,7 +447,7 @@ async function corosImport() {
   if (!raw || !state.onboarded || state.demo) return;
   try { await online.start(state); } catch { return; }
   try { localStorage.removeItem('stepsy-coros'); } catch {}
-  if (online.myCode() !== COROS_CODE) return;
+  if (!(await isOwner(online.myCode()))) return;
   const days = {};
   for (const part of raw.split('_')) {
     const m = /^(\d{4}-\d{2}-\d{2})\.(\d{1,6})$/.exec(part);

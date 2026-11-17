@@ -757,6 +757,10 @@ body:not(.demo) .demo-only { display: none !important; }
 .prof-name { padding: 10px 16px 12px; text-align: center; }
 .prof-name h2 { font-size: 30px; line-height: 1.05; overflow-wrap: anywhere; }
 .prof-name p { margin: 2px 0 0; font-size: 15px; color: var(--ink-soft); font-weight: 700; }
+.prof-name .rename { margin-top: 8px; min-height: 40px; }
+.unfriend { display: block; margin: 14px auto 0; }
+.unfriend[hidden] { display: none; }
+.code-row.name-row input { width: 100%; max-width: 15ch; text-transform: none; letter-spacing: 0; }
 /* Their own numbers as the big type. */
 .prof-stats { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
 .prof-stats .ps { display: grid; align-content: center; gap: 2px; padding: 12px 14px 10px; border: var(--line) solid var(--ink); border-radius: var(--r-md); background: var(--card); box-shadow: 0 3px 0 rgba(91, 44, 30, .18); }
@@ -795,7 +799,7 @@ body:not(.demo) .demo-only { display: none !important; }
 /* Kid dry view (17 Nov): in the Shop the look stays in view; only the items scroll under it. */
 #screen-shop { overflow: hidden; padding-bottom: 0; }
 #screen-shop .dress-stage { height: clamp(170px, 25vh, 240px); }
-/* Tedd (17 Nov): the item list was too short to scroll on a real iPhone. The look now sits beside its name and
+/* (17 Nov) the item list was too short to scroll on a real iPhone. The look now sits beside its name and
    button (one short row instead of two tall ones), so the list gets about twice the room. */
 #screen-shop .dressing { flex: none; display: grid; grid-template-columns: 54% 1fr; }
 #screen-shop .dress-stage { height: clamp(150px, 23svh, 210px); border-bottom: 0; border-right: var(--line) solid var(--ink); }
@@ -832,7 +836,7 @@ body:not(.demo) .demo-only { display: none !important; }
 .perm.off .btn-soft { opacity: .8; }
 #screen-me[data-who="me"] #meBack { display: none; }
 
-/* Tedd (17 Nov): on iPhone Safari the address bar only shrinks when the PAGE itself scrolls, not a box inside it.
+/* (17 Nov) on iPhone Safari the address bar only shrinks when the PAGE itself scrolls, not a box inside it.
    So the page scrolls now. Start walk + the tabs stay pinned to the bottom of the screen, and in the Shop the
    look and its tabs stay stuck at the top while the items scroll under them. */
 html, body { height: auto; min-height: 100%; }

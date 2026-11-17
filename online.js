@@ -3,8 +3,10 @@
 // nickname, look, buddy, animals, badges, today's steps, streak and level. No chat, no search, no list of players:
 // you can only find someone by their code (QR, typed, or their link), and they must tap Accept.
 import { FIREBASE_CONFIG } from './firebase-config.js';
+import { PET_ORDER } from './pets.js';
+import { BADGES } from './data.js';
 
-const V = '12.6.0';
+const V = '12.19.0';
 const CODE_ABC = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789'; // no 0/O or 1/I/L, so codes are easy to read out
 export const CODE_RE = /^[A-HJ-NP-Z2-9]{3}-[A-HJ-NP-Z2-9]{3}$/;
 
@@ -21,7 +23,7 @@ export const myCode = () => me?.code || null;
 export const friendList = () => [...friends.values()].sort((a, b) => a.name.localeCompare(b.name));
 export const cheerList = () => cheers;
 let requests = [];
-export const requestList = () => requests;
+export const requestList = () => requests.filter((r) => !friends.has(r.uid));
 export function onChange(f) { listeners.add(f); return () => listeners.delete(f); }
 
 async function load() {
@@ -50,16 +52,22 @@ export function start(state) {
     const ref = f.doc(f.db, 'players', uid);
     const snap = await f.getDoc(ref);
     let code = snap.exists() ? snap.data().code : null;
-    if (!code) {
-      // Claim a free code. The rules only let a code be created once, so a clash just tries another.
+    if (code) {
+      me = { uid, code };
+      await pushProfile(state, true);
+    } else {
+      // Claim a free code together with your first profile (the rules allow one code per player, and a code
+      // can only be created once, so a clash just tries another).
       for (let i = 0; i < 6 && !code; i++) {
         const c = newCode();
-        try { await f.setDoc(f.doc(f.db, 'codes', c), { uid }); code = c; } catch {}
+        me = { uid, code: c };
+        const batch = f.writeBatch(f.db);
+        batch.set(f.doc(f.db, 'codes', c), { uid });
+        batch.set(ref, { ...profileOf(state), updated: f.serverTimestamp() });
+        try { await batch.commit(); code = c; } catch {}
       }
-      if (!code) throw new Error('no code');
+      if (!code) { me = null; throw new Error('no code'); }
     }
-    me = { uid, code };
-    await pushProfile(state, true);
     listen();
     return me;
   })().catch((e) => { ready = null; throw e; });
@@ -68,14 +76,18 @@ export function start(state) {
 
 const today = () => new Date().toLocaleDateString('en-CA');
 function profileOf(state) {
-  const pets = [...new Set(state.pets.map((p) => p.type))];
-  const gold = [...new Set(state.pets.filter((p) => p.gold).map((p) => p.type))];
+  // Only known animals and badges are sent (the rules refuse anything else).
+  const pets = [...new Set(state.pets.map((p) => p.type))].filter((t) => PET_ORDER.includes(t));
+  const gold = [...new Set(state.pets.filter((p) => p.gold).map((p) => p.type))].filter((t) => PET_ORDER.includes(t));
+  const badgeIds = BADGES.map((b) => b.id);
+  const badges = [...new Set(state.badges || [])].filter((b) => badgeIds.includes(b));
+  const short = (v) => (typeof v === 'string' && v ? v.slice(0, 24) : null);
   return {
     code: me.code, name: String(state.nickname || 'Walker').slice(0, 16),
-    outfit: { look: state.outfit.look, hat: state.outfit.hat || null, eyes: state.outfit.eyes || null, hold: state.outfit.hold || null },
-    buddy: state.buddy || null, pets, gold, badges: (state.badges || []).slice(0, 20),
-    today: Math.max(0, Math.round(state.steps || 0)), day: today(),
-    streak: Math.max(0, state.streak || 0), level: Math.max(1, state.level || 1),
+    outfit: { look: short(state.outfit.look) || '', hat: short(state.outfit.hat), eyes: short(state.outfit.eyes), hold: short(state.outfit.hold) },
+    buddy: short(state.buddy), pets, gold, badges,
+    today: Math.min(199999, Math.max(0, Math.round(state.steps || 0))), day: today(),
+    streak: Math.max(0, Math.round(state.streak || 0)), level: Math.max(1, Math.round(state.level || 1)),
   };
 }
 let lastSent = '', pushTimer = 0;
@@ -101,7 +113,10 @@ function listen() {
   const f = fb;
   f.onSnapshot(f.collection(f.db, 'players', me.uid, 'friends'), (snap) => {
     const ids = new Set(snap.docs.map((d) => d.id));
-    for (const [id, un] of friendUnsubs) if (!ids.has(id)) { un(); friendUnsubs.delete(id); friends.delete(id); }
+    for (const [id, un] of friendUnsubs) if (!ids.has(id)) { un(); friendUnsubs.delete(id); }
+    // Also drop anyone who is no longer a friend but whose profile watcher already stopped (after a removal,
+    // their profile is refused a moment before this update arrives).
+    for (const id of [...friends.keys()]) if (!ids.has(id)) friends.delete(id);
     ids.forEach(function watch(id) {
       if (friendUnsubs.has(id)) return;
       // Right after you add someone, their profile can be refused for a moment (the friendship is still
@@ -137,7 +152,7 @@ function listen() {
     const fresh = firstReq ? [] : snap.docChanges().filter((c) => c.type === 'added').map((c) => ({ uid: c.doc.id, ...c.doc.data() }));
     firstReq = false;
     requests = snap.docs.map((d) => ({ uid: d.id, from: d.data().from || 'A friend', at: d.data().at?.toMillis?.() || Date.now() }))
-      .filter((r) => !friends.has(r.uid)).sort((a, b) => b.at - a.at);
+      .sort((a, b) => b.at - a.at);
     changed();
     fresh.forEach((r) => newRequest?.(r));
   }, () => {});
@@ -170,7 +185,8 @@ export async function sendRequest(code, fromName) {
   return { ok: true };
 }
 
-// Tapping Accept: both of you become friends, then the request is cleared.
+// Tapping Accept: both of you become friends and the request is cleared in the same save (the rules insist,
+// so an old request can't bring a removed friend back). A request you sent them is taken back too.
 export async function acceptRequest(fromUid) {
   await ready;
   const f = fb;
@@ -178,9 +194,33 @@ export async function acceptRequest(fromUid) {
   const batch = f.writeBatch(f.db);
   batch.set(f.doc(f.db, 'players', me.uid, 'friends', fromUid), { at, by: me.uid });
   batch.set(f.doc(f.db, 'players', fromUid, 'friends', me.uid), { at, by: me.uid });
+  batch.delete(f.doc(f.db, 'players', me.uid, 'requests', fromUid));
+  batch.delete(f.doc(f.db, 'players', fromUid, 'requests', me.uid));
   await batch.commit();
-  await f.deleteDoc(f.doc(f.db, 'players', me.uid, 'requests', fromUid)).catch(() => {});
 }
+// Remove a friend: both sides are cleared together, so neither of you sees the other any more.
+// Their cheers to you go too. You can add each other again later with a new request.
+export async function removeFriend(uid) {
+  await ready;
+  const f = fb;
+  const batch = f.writeBatch(f.db);
+  batch.delete(f.doc(f.db, 'players', me.uid, 'friends', uid));
+  batch.delete(f.doc(f.db, 'players', uid, 'friends', me.uid));
+  batch.delete(f.doc(f.db, 'players', me.uid, 'requests', uid));
+  batch.delete(f.doc(f.db, 'players', uid, 'requests', me.uid));
+  await batch.commit();
+  await f.deleteDoc(f.doc(f.db, 'players', me.uid, 'cheers', uid)).catch(() => {});
+  friendUnsubs.get(uid)?.(); friendUnsubs.delete(uid); friends.delete(uid); lastIds.delete(uid);
+  changed();
+}
+
+// After the phone sleeps or the internet drops, the live link to Firebase can hang (friends stop showing until a
+// reload). Turning the link off and on again makes Firebase reconnect and resend everything.
+export async function wake() {
+  if (!fb || !me) return;
+  try { await fb.disableNetwork(fb.db); await fb.enableNetwork(fb.db); } catch {}
+}
+
 export async function declineRequest(fromUid) {
   await ready;
   await fb.deleteDoc(fb.doc(fb.db, 'players', me.uid, 'requests', fromUid));

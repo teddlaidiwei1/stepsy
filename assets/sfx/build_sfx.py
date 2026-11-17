@@ -3,7 +3,7 @@ import subprocess, sys, os
 import numpy as np
 
 SR = 44100
-LIB = r"C:\Users\Admin\.claude\tools\sfxlib"
+LIB = os.environ.get("SFXLIB") or os.path.join(os.path.expanduser("~"), ".claude", "tools", "sfxlib")
 OUT = sys.argv[1]
 os.makedirs(OUT, exist_ok=True)
 DIG = LIB + r"\kenney_digital-audio\Audio\\"

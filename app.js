@@ -816,9 +816,9 @@ function sendSOS() {
   const body = openSheet(`
     <div class="sos-sent">
       <h2 id="sheetTitle">SOS (demo)</h2>
-      <p>In the real app, your parent gets an alert with where you are now.</p>
-      <p class="muted">Location: ${esc(where)}</p>
-      <p class="muted small">Demo only: no message was sent. If you really need help, ask an adult nearby or call 999.</p>
+      <p><strong>This is only a demo. No message was sent and nobody was called.</strong></p>
+      <p>If you really need help, ask an adult nearby or call 999.</p>
+      <p class="muted small">Idea for a real app: your parent would get an alert with where you are. Location: ${esc(where)}</p>
       <div class="sheet-actions"><button class="btn-main" type="button" data-act="close">I'm OK now</button></div>
     </div>`);
   body.querySelector('[data-act="close"]').addEventListener('click', closeSheet);

@@ -8,13 +8,26 @@ service cloud.firestore {
       return exists(/databases/$(database)/documents/players/$(owner)/friends/$(request.auth.uid));
     }
     function shortStr(v, n) { return v is string && v.size() <= n; }
+    function optStr(v, n) { return v == null || shortStr(v, n); }
+    function intIn(v, lo, hi) { return v is int && v >= lo && v <= hi; }
+    // Keep these lists the same as PET_ORDER in pets.js and BADGES in data.js.
+    function petIds() { return ['otter', 'kingfisher', 'monitor', 'hornbill', 'pangolin', 'mousedeer', 'turtle']; }
+    function badgeIds() { return ['first', 'egg', '5k', 'week', 'collector', 'explorer', 'gold']; }
+    function okOutfit(o) {
+      return o is map && o.keys().hasOnly(['look', 'hat', 'eyes', 'hold'])
+        && shortStr(o.get('look', ''), 24) && optStr(o.get('hat', null), 24)
+        && optStr(o.get('eyes', null), 24) && optStr(o.get('hold', null), 24);
+    }
 
-    // Friend codes: look one up only by its exact code (no listing), claim a free one once, never change it.
+    // Friend codes: look one up only by its exact code (no listing), never change it.
+    // One code per player: it can only be claimed together with that player's very first profile.
     match /codes/{code} {
       allow get: if signedIn();
       allow list: if false;
       allow create: if signedIn() && code.matches('^[A-HJ-NP-Z2-9]{3}-[A-HJ-NP-Z2-9]{3}$')
-        && request.resource.data.keys().hasOnly(['uid']) && request.resource.data.uid == request.auth.uid;
+        && request.resource.data.keys().hasOnly(['uid']) && request.resource.data.uid == request.auth.uid
+        && !exists(/databases/$(database)/documents/players/$(request.auth.uid))
+        && getAfter(/databases/$(database)/documents/players/$(request.auth.uid)).data.code == code;
       allow update, delete: if false;
     }
 
@@ -22,35 +35,52 @@ service cloud.firestore {
       // You and your friends can read your profile. Nobody can list all players.
       allow get: if signedIn() && (request.auth.uid == uid || isFriend(uid));
       allow list: if false;
+      // Only small, known values, so nobody can stuff a profile with junk that breaks friends' screens.
       allow create, update: if signedIn() && request.auth.uid == uid
         && request.resource.data.keys().hasOnly(['code', 'name', 'outfit', 'buddy', 'pets', 'gold', 'badges', 'today', 'day', 'streak', 'level', 'updated'])
+        && (resource == null || request.resource.data.code == resource.data.code)
+        && getAfter(/databases/$(database)/documents/codes/$(request.resource.data.code)).data.uid == uid
         && shortStr(request.resource.data.name, 16)
-        && exists(/databases/$(database)/documents/codes/$(request.resource.data.code))
-        && get(/databases/$(database)/documents/codes/$(request.resource.data.code)).data.uid == uid
-        && request.resource.data.today is int && request.resource.data.today >= 0 && request.resource.data.today < 200000
-        && request.resource.data.pets is list && request.resource.data.pets.size() <= 30
-        && request.resource.data.badges is list && request.resource.data.badges.size() <= 20;
+        && okOutfit(request.resource.data.outfit)
+        && optStr(request.resource.data.buddy, 24)
+        && request.resource.data.pets is list && request.resource.data.pets.size() <= 7 && request.resource.data.pets.hasOnly(petIds())
+        && request.resource.data.gold is list && request.resource.data.gold.size() <= 7 && request.resource.data.gold.hasOnly(petIds())
+        && request.resource.data.badges is list && request.resource.data.badges.size() <= 7 && request.resource.data.badges.hasOnly(badgeIds())
+        && intIn(request.resource.data.today, 0, 199999)
+        && request.resource.data.day is string && request.resource.data.day.matches('^[0-9]{4}-[0-9]{2}-[0-9]{2}$')
+        && intIn(request.resource.data.streak, 0, 100000) && intIn(request.resource.data.level, 1, 100000)
+        && request.resource.data.updated == request.time;
       allow delete: if false;
 
       // Friend requests: sent to someone whose code you have. One per person (the request's ID is the sender),
-      // and only the person who got it can see it, accept it or say no.
+      // and only the person who got it can see it, accept it or say no. The sender can take it back.
       match /requests/{fromUid} {
-        allow read, delete: if signedIn() && request.auth.uid == uid;
+        allow read: if signedIn() && request.auth.uid == uid;
+        allow delete: if signedIn() && (request.auth.uid == uid || request.auth.uid == fromUid);
         allow create: if signedIn() && request.auth.uid == fromUid && fromUid != uid
           && request.resource.data.keys().hasOnly(['from', 'at'])
           && shortStr(request.resource.data.from, 16) && request.resource.data.at == request.time;
         allow update: if false;
       }
 
-      // Friends: only made when someone taps Accept on a request. The person accepting writes both sides.
+      // Friends: only made when someone taps Accept on a request. The person accepting writes both sides and
+      // clears the request in the same save, so an old request can never be used again after a friend is removed.
+      function accepted(me, them) {
+        return request.auth.uid == me
+          && exists(/databases/$(database)/documents/players/$(me)/requests/$(them))
+          && !existsAfter(/databases/$(database)/documents/players/$(me)/requests/$(them))
+          && existsAfter(/databases/$(database)/documents/players/$(me)/friends/$(them))
+          && existsAfter(/databases/$(database)/documents/players/$(them)/friends/$(me));
+      }
       match /friends/{fid} {
         allow read: if signedIn() && request.auth.uid == uid;
         allow create: if signedIn() && uid != fid
           && request.resource.data.keys().hasOnly(['at', 'by']) && request.resource.data.by == request.auth.uid
-          && ((request.auth.uid == uid && exists(/databases/$(database)/documents/players/$(uid)/requests/$(fid)))
-            || (request.auth.uid == fid && exists(/databases/$(database)/documents/players/$(fid)/requests/$(uid))));
+          && request.resource.data.at == request.time
+          && (accepted(uid, fid) || accepted(fid, uid));
         allow update: if false;
-        allow delete: if signedIn() && request.auth.uid == uid;
+        // Either friend can remove the friendship (the app clears both sides together).
+        allow delete: if signedIn() && (request.auth.uid == uid || request.auth.uid == fid);
       }
 
       // Cheers: only friends can send, only the fixed cheer words, only you can read yours.

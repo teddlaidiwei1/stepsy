@@ -33,11 +33,11 @@ export function scanQR(box) {
   const promise = new Promise(async (resolve, reject) => {
     rejectIt = reject;
     try {
-      const [jsQR, s] = await Promise.all([
-        loadJsQR(),
-        navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment', width: { ideal: 1280 } }, audio: false }),
-      ]);
-      stream = s;
+      // Keep hold of the camera as soon as it opens, so it is always switched off again, even if the QR reader
+      // fails to load or the kid closed the scanner while the camera was still starting.
+      const cam = navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment', width: { ideal: 1280 } }, audio: false })
+        .then((s) => { stream = s; if (stopped) s.getTracks().forEach((t) => t.stop()); return s; });
+      const [jsQR] = await Promise.all([loadJsQR(), cam]);
       if (stopped) { stop(); return; }
       video.srcObject = stream;
       box.prepend(video);
